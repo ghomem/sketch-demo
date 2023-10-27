@@ -78,12 +78,12 @@ def insert_db_row(connection, path):
 # deletes every object inside the bucket
 def init_bucket(bucket_name, verbose=False):
 
-    # we are using the traditional cient API instead of the newer resource API because 
+    # we are using the traditional cient API instead of the newer resource API because
     # the enumeration of objects using the resource API was not working on Digital Ocean
     # the traditional API seems to be the recommended practice at this point
     # https://docs.digitalocean.com/products/spaces/reference/s3-sdk-examples/
     #
-    # see also: 
+    # see also:
     # https://stackoverflow.com/questions/65687417/list-all-objects-in-digitalocean-bucket
 
     # furthermore, enumerating objects might turn out to be too slow in a real world case
