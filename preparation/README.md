@@ -8,9 +8,11 @@ This script requires:
 * a working PostgreSQL database reachable on the machine where it is executed
 * admin credentials for this database
 * access key/secret pair with write access to the S3 bucket
-
+* the following apt packages: python3-psycopg2, python3-boto3, postgresql-client
+  
 ## usage
 
+In order to use this script the config.py variables must be edited after which the following command can be executed:
 ```
 python3 sketch_prepare.py NENTRIES
 ```
