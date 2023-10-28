@@ -120,6 +120,18 @@ def create_s3_object(s3_conn, bucket, path):
         sys.exit(1)
 
 
+# checks if the user really wants to move forward
+def check_willingness():
+
+    print(f"WARNING: this script will DROP and re-CREATE database {DB_NAME} and delete all contents of bucket {S3_BUCKET_NAME}.")
+
+    user_response = input('Are you sure you want to continue? (yes/no) ')
+
+    if user_response != 'yes':
+        print('Execution canceled')
+        exit(1)
+
+
 # main script
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script seeds the database and s3 bucket with the number of legacy avatars passed as a first argument. Previsouly stored data is deleted.')
@@ -129,6 +141,9 @@ if __name__ == "__main__":
 
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
+
+    # Check if the user really wants to do this
+    check_willingness()
 
     # Connect to the database server using the default database
     try:
