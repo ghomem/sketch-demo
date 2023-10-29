@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 import logging
 import argparse
 import psycopg2
@@ -38,7 +39,7 @@ def check_environment():
 def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
 
     if verbose:
-        print("got s3 batch")
+        print("Got S3 batch")
 
     sucessfully_copied = []
     for row in batch:
@@ -71,7 +72,7 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
                 logging.error(f"Error copying file {old_key}: {e}")
 
     if verbose:
-        print("s3 batch done")
+        print("S3 batch done")
 
     # we return the list of sucessfully copied files to be used as an input for the update of db rows
     return sucessfully_copied
@@ -81,7 +82,7 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
 def update_db_batch(connection, rows_to_update, verbose=False):
 
     if verbose:
-        print("got db batch")
+        print("Got DB batch")
 
     cur = connection.cursor()
     nr_updated_rows = 0
@@ -103,7 +104,7 @@ def update_db_batch(connection, rows_to_update, verbose=False):
     connection.commit()
 
     if verbose:
-        print("db batch done")
+        print("DB batch done")
 
     return nr_updated_rows
 
@@ -117,8 +118,15 @@ def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch
     try:
         cur = connection.cursor()
 
+        start_time = time.time()
         # this SELECT statement fetches the rows that match the legacy pattern
         cur.execute('SELECT * from avatars WHERE path LIKE(\'image/%\');')
+        end_time = time.time()
+
+        elapsed_time = round(end_time - start_time, 2)
+
+        if verbose:
+            print(f"\nThe execution of SELECT took {elapsed_time} seconds\n")
 
         # we retreive the entries in batches
         batch = cur.fetchmany(batch_size)
@@ -129,8 +137,34 @@ def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch
             # files that were already on the destination bucket of files for which there was an error
             # do not have their corresponding db entry updated
 
+            # perform s3 copy
+            start_time = time.time()
             rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose)
+            end_time = time.time()
+
+            elapsed_time = end_time - start_time
+            avg_time_per_file = round(elapsed_time / len(batch), 2)  # this is affected by previously existing files (but that is not the case of interest for measurement)
+
+            elapsed_time_readable = round(elapsed_time, 2)
+
+            if verbose:
+                print(f"\nThe execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
+
+            # update database rows
+            start_time = time.time()
             updated_rows = update_db_batch(connection, rows_to_update, verbose)
+            end_time = time.time()
+
+            elapsed_time = end_time - start_time
+            if len(rows_to_update) > 0:
+                avg_time_per_row = round(elapsed_time / len(rows_to_update), 2)  # same criterium as for measuring files, affected by row update errors (not frequent, not the case of intereset)
+            else:
+                avg_time_per_row = -1
+
+            elapsed_time_readable = round(elapsed_time, 2)
+
+            if verbose:
+                print(f"\nThe execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
 
             total_copied_files += len(rows_to_update)
             total_updated_rows += updated_rows
@@ -208,6 +242,12 @@ if __name__ == "__main__":
 
     print('Migrating legacy data')
 
+    start_time = time.time()
+
     migrate_legacy_data(conn, s3, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.verbose)
 
-    print('Execution finished')
+    end_time = time.time()
+
+    elapsed_time = round(end_time - start_time, 2)
+
+    print(f"Execution finished after {elapsed_time} seconds")
