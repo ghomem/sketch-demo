@@ -15,7 +15,7 @@ This script requires:
 
 In order to use this script the config.py variables must be edited after which the following command can be executed:
 ```
-python3 sketch_prepare.py NENTRIES
+python3 sketch_prepare.py [-h] [-c] [-v] number_of_avatars
 ```
 
-where NENTRIES is the number of entries (files and database rows) to generate. The --verbose flag is available for debugging purposes.
+where NENTRIES is the number of entries (files and database rows) to generate. The -c flag enables the clean up of the production bucket. The -v flag is available for debugging purposes.
