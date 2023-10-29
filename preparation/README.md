@@ -18,4 +18,4 @@ In order to use this script the config.py variables must be edited after which t
 python3 sketch_prepare.py [-h] [-c] [-v] number_of_avatars
 ```
 
-where NENTRIES is the number of entries (files and database rows) to generate. The -c flag enables the clean up of the production bucket. The -v flag is available for debugging purposes.
+where ```number_of_avatars``` is the number of entries (files and database rows) to generate. The -c flag enables the clean up of the production bucket. The -v flag is available for debugging purposes.
