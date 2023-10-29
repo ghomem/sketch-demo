@@ -27,6 +27,10 @@ DB_CONN_STRING_1 = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NA
 S3_BUCKET_NAME      = 'sketch-production-s3'
 S3_BUCKET_NAME_LEG  = 'sketch-legacy-s3'
 
+# maximum objects we are requesting at once (anything above 1000 is floored to 1000)
+# lower this value only to debug pagination
+S3_MAX_OBJECTS_REQ = 1000
+
 # S3 connection details
 S3_BUCKET_DOMAIN    = 'fra1.digitaloceanspaces.com'
 S3_ENDPOINT_URL     = f"https://{S3_BUCKET_NAME}.{S3_BUCKET_DOMAIN}"

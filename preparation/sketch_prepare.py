@@ -41,7 +41,7 @@ def generate_path(n):
     while num < n:
         index = round(random.random())
         prefix = prefixes[index]
-        yield f"{prefix}/avatar-{num:03d}.png"
+        yield f"{prefix}/avatar-{num:09d}.png"
         num += 1
 
 
@@ -82,17 +82,53 @@ def insert_db_row(connection, path):
 # deletes every object inside the bucket
 def init_bucket(s3_conn, bucket_name, verbose=False):
 
-    response = s3_conn.list_objects(Bucket=bucket_name)
+    response = s3_conn.list_objects_v2(Bucket=bucket_name, MaxKeys=S3_MAX_OBJECTS_REQ)
 
     try:
-        for obj in response['Contents']:
+        objects = response['Contents']
+    except Exception as e:
+        if verbose:
+            print(f"  * bucket {bucket_name} was already empty")
+        return
+
+    # we need to loop because the list_objects_v2 functions never returns more than 1000
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_objects_v2.html#list-objects-v2
+
+    nr_deleted_objects_total   = 0
+
+    nr_found_objects_partial = len(objects)
+    nr_found_objects_total   = len(objects)
+
+    while nr_found_objects_partial > 0:
+        nr_deleted_objects_partial = 0
+        for obj in objects:
             key = obj['Key']
             if verbose:
                 print('  * deleting', key)
             s3_conn.delete_object(Bucket=bucket_name, Key=key)
-    except Exception as e:
-        if verbose:
-            print(f"  * bucket {bucket_name} is already empty")
+            nr_deleted_objects_partial += 1
+
+        print(f"  * partial count: found {nr_found_objects_partial} objects, deleted {nr_deleted_objects_partial} objects")
+        nr_deleted_objects_total += nr_deleted_objects_partial
+
+        if not response.get('IsTruncated'):
+            break
+        else:
+            continuation_token = response.get('NextContinuationToken')
+
+        response = s3_conn.list_objects_v2(Bucket=bucket_name, MaxKeys=S3_MAX_OBJECTS_REQ, ContinuationToken=continuation_token)
+        try:
+            objects = response['Contents']
+            nr_found_objects_partial = len(objects)
+            nr_found_objects_total += nr_found_objects_partial
+            if verbose:
+                print(f"  * bucket {bucket_name} has more objects")
+        except Exception as e:
+            if verbose:
+                print(f"  * bucket {bucket_name} has been emptied")
+            nr_found_objects_partial = 0
+
+    print(f"  * final count: found {nr_found_objects_total} objects, deleted {nr_deleted_objects_total} objects")
 
 
 # creates the avatar file in the S3 bucket
