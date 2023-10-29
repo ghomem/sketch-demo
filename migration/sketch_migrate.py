@@ -38,16 +38,17 @@ def check_environment():
 def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
 
     if verbose:
-        print("got batch")
+        print("got s3 batch")
 
-    for entry in batch:
-        old_key = entry[1]
+    sucessfully_copied = []
+    for row in batch:
+        old_key = row[1]
         copy_source = { 'Bucket': bucket_src, 'Key': old_key }
         filename = os.path.basename(old_key)
         new_key = f"avatar/{filename}"
 
         # check first if an object with the same key is already in the production bucket
-        # for performance, integrity and idenpotency reasons we do not overwrite an existing file on bucket_dst
+        # for performance, integrity and idempotency reasons we do not overwrite an existing file on bucket_dst
         response = s3_connection.list_objects_v2(Bucket=bucket_dst, Prefix=new_key)
 
         try:
@@ -64,15 +65,54 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
             try:
                 # reference https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/copy.html#copy
                 s3_connection.copy(copy_source, bucket_dst, new_key)
+                # we store the list of sucessfully copied files
+                sucessfully_copied.append(row)
             except Exception as e:
                 logging.error(f"Error copying file {old_key}: {e}")
 
     if verbose:
-        print("batch done")
+        print("s3 batch done")
+
+    # we return the list of sucessfully copied files to be used as an input for the update of db rows
+    return sucessfully_copied
 
 
-# high level function to do the file migration work
-def migrate_legacy_files(connection, s3_connection, bucket_src, bucket_dst, batch_size, verbose=False):
+# this function updates a batch of database rows
+def update_db_batch(connection, rows_to_update, verbose=False):
+
+    if verbose:
+        print("got db batch")
+
+    cur = connection.cursor()
+    nr_updated_rows = 0
+    try:
+        for row in rows_to_update:
+            row_id  = row[0]
+            old_key = row[1]
+            filename = os.path.basename(old_key)
+            new_key = f"avatar/{filename}"
+
+            if verbose:
+                print(f"  * updating {old_key} to {new_key}")
+
+            cur.execute("UPDATE avatars SET path = %s WHERE id = %s", (new_key, row_id))
+            nr_updated_rows += 1
+    except Exception as e:
+        logging.error(f"Error updating row {entry}: {e}")
+
+    connection.commit()
+
+    if verbose:
+        print("db batch done")
+
+    return nr_updated_rows
+
+
+# high level function to perform the data migration work
+def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch_size, verbose=False):
+
+    total_copied_files = 0
+    total_updated_rows = 0
 
     try:
         cur = connection.cursor()
@@ -84,8 +124,17 @@ def migrate_legacy_files(connection, s3_connection, bucket_src, bucket_dst, batc
         batch = cur.fetchmany(batch_size)
 
         while len(batch) > 0:
-            # TODO return the list of problematic files, multiprocessing
-            copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose)
+
+            # we only update the entries that correspond to files that have been copied
+            # files that were already on the destination bucket of files for which there was an error
+            # do not have their corresponding db entry updated
+
+            rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose)
+            updated_rows = update_db_batch(connection, rows_to_update, verbose)
+
+            total_copied_files += len(rows_to_update)
+            total_updated_rows += updated_rows
+
             batch = cur.fetchmany(batch_size)
 
         cur.close()
@@ -95,18 +144,11 @@ def migrate_legacy_files(connection, s3_connection, bucket_src, bucket_dst, batc
         connection.close()
         sys.exit(1)
 
+    print(f"Copied {total_copied_files} files")
+    print(f"Updated {total_updated_rows} rows")
 
-# FIXME update_db_row
-# inserts the reference to an avatar in a table row
-def insert_db_row(connection, path):
-    try:
-        cur = conn.cursor()
-        cur.execute("INSERT INTO avatars (path) VALUES (%s)", (path,))
-        conn.commit()
-    except Exception as e:
-        logging.error(f"Error inserting to the database: {e}")
-        connection.close()
-        sys.exit(1)
+    if total_updated_rows != total_copied_files:
+        print("ERROR: the number of updated rows should be equal to the number of copied files")
 
 
 # checks if the user really wants to move forward
@@ -164,12 +206,8 @@ if __name__ == "__main__":
         logging.error(f"Error while connecting to S3: {e}")
         sys.exit(1)
 
-    print('Copying legacy files')
+    print('Migrating legacy data')
 
-    # first we copy the files to the new bucket, the old ones remain where they were
-    # therefore the database entries reman functional (pointing to the old ones)
-    migrate_legacy_files(conn, s3, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.verbose)
-
-    # TODO now we migrate the database entries
+    migrate_legacy_data(conn, s3, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.verbose)
 
     print('Execution finished')
