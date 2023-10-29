@@ -3,6 +3,8 @@ This script migrates legacy data to the new desired production situation. Specif
 * copies the files from bucket ```sketch-legacy-s3/image``` to bucket ```sketch-production-s3/avatar```
 * updates the corresponding database references from image/avatar-XXX.png to avatar/avatar-XXX.png
 
+For safety reasons nothing is deleted from ```sketch-legacy-s3/image```. The simple operation of deleting all legacy files can be done manually once it is clear that the migration process went without problems.
+
 ## requirements
 This script requires:
 * a working PostgreSQL database reachable on the machine where it is executed
