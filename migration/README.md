@@ -1,6 +1,6 @@
 ## Introduction
 This script migrates legacy data to the new desired production situation. Specifically, this script:
-* copies the files from bucket sketch-legacy-s3/image to bucket sketch-production-s3/avatar
+* copies the files from bucket ```sketch-legacy-s3/image``` to bucket ```sketch-production-s3/avatar```
 * updates the corresponding database references from image/avatar-XXX.png to avatar/avatar-XXX.png
 
 ## requirements
