@@ -20,4 +20,6 @@ In order to use this script the config.py variables must be edited after which t
 python3 sketch_migrate.py [-h] [-v] batch_size
 ```
 
-where ```batch_size``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration. The -v flag is available for debugging purposes.
+where ```batch_size``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration. The -v flag is available for debugging purposes. The -d value forces a dry run execution mode.
+
+It is recommended to execute the script with the -v and -f flags before proceeding to the actual migration.
