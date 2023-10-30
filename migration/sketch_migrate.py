@@ -36,7 +36,12 @@ def check_environment():
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
-def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
+def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False, dry_run=False):
+
+    if dry_run:
+        msg_prefix='DRY RUN '
+    else:
+        msg_prefix=''
 
     if verbose:
         print("Got S3 batch")
@@ -60,12 +65,13 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
         except Exception as e:
             skip = False
             if verbose:
-                print(f"  * copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
+                print(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
 
         if skip is not True:
             try:
                 # reference https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/copy.html#copy
-                s3_connection.copy(copy_source, bucket_dst, new_key)
+                if not dry_run:
+                    s3_connection.copy(copy_source, bucket_dst, new_key)
                 # we store the list of sucessfully copied files
                 sucessfully_copied.append(row)
             except Exception as e:
@@ -79,7 +85,12 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False):
 
 
 # this function updates a batch of database rows
-def update_db_batch(connection, rows_to_update, verbose=False):
+def update_db_batch(connection, rows_to_update, verbose=False, dry_run=False):
+
+    if dry_run:
+        msg_prefix='DRY RUN '
+    else:
+        msg_prefix=''
 
     if verbose:
         print("Got DB batch")
@@ -94,9 +105,10 @@ def update_db_batch(connection, rows_to_update, verbose=False):
             new_key = f"avatar/{filename}"
 
             if verbose:
-                print(f"  * updating {old_key} to {new_key}")
+                print(f"  * {msg_prefix}updating {old_key} to {new_key}")
 
-            cur.execute("UPDATE avatars SET path = %s WHERE id = %s", (new_key, row_id))
+            if not dry_run:
+                cur.execute("UPDATE avatars SET path = %s WHERE id = %s", (new_key, row_id))
             nr_updated_rows += 1
     except Exception as e:
         logging.error(f"Error updating row {entry}: {e}")
@@ -110,7 +122,7 @@ def update_db_batch(connection, rows_to_update, verbose=False):
 
 
 # high level function to perform the data migration work
-def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch_size, verbose=False):
+def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch_size, verbose=False, dry_run=False):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -139,7 +151,7 @@ def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch
 
             # perform s3 copy
             start_time = time.time()
-            rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose)
+            rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose, dry_run)
             end_time = time.time()
 
             elapsed_time = end_time - start_time
@@ -152,7 +164,7 @@ def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch
 
             # update database rows
             start_time = time.time()
-            updated_rows = update_db_batch(connection, rows_to_update, verbose)
+            updated_rows = update_db_batch(connection, rows_to_update, verbose, dry_run)
             end_time = time.time()
 
             elapsed_time = end_time - start_time
@@ -178,8 +190,13 @@ def migrate_legacy_data(connection, s3_connection, bucket_src, bucket_dst, batch
         connection.close()
         sys.exit(1)
 
-    print(f"Copied {total_copied_files} files")
-    print(f"Updated {total_updated_rows} rows")
+    if dry_run:
+        msg_prefix='DRY RUN '
+    else:
+        msg_prefix=''
+
+    print(f"{msg_prefix}Copied {total_copied_files} files")
+    print(f"{msg_prefix}Updated {total_updated_rows} rows")
 
     if total_updated_rows != total_copied_files:
         print("ERROR: the number of updated rows should be equal to the number of copied files")
@@ -202,10 +219,14 @@ def check_willingness():
 # main script
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='This script migrate files from the legacy bucket to the current production bucket and edits the corresponding database entries.')
+    parser = argparse.ArgumentParser(description='This script migrates files from the legacy bucket to the current production bucket and updates the corresponding database entries.')
 
-    parser.add_argument('batch_size', type=int, help='Number of copies to process at once')
-    parser.add_argument( '-v', '--verbose', help='print extra messages', default=False, action='store_true')
+    # positional required argument
+    parser.add_argument('batch_size',       help='number of copies to process at once', type=int)
+
+    # flags
+    parser.add_argument( '-v', '--verbose', help='print extra messages',                          default=False, action='store_true')
+    parser.add_argument( '-d', '--dry-run', help='simulate execution without actually executing', default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -244,7 +265,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    migrate_legacy_data(conn, s3, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.verbose)
+    migrate_legacy_data(conn, s3, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.verbose, args.dry_run)
 
     end_time = time.time()
 
