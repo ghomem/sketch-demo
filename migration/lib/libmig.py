@@ -9,6 +9,10 @@ import botocore
 from lib.config import *
 
 
+# we obtain the logger declared in main for use within this module
+logger = logging.getLogger("miglogger")
+
+
 # this function obtains a database connection
 def get_db_connection():
 
@@ -30,15 +34,14 @@ def get_s3_connection():
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
-def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False, dry_run=False):
+def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
 
     if dry_run:
         msg_prefix = 'DRY RUN '
     else:
         msg_prefix = ''
 
-    if verbose:
-        print("Got S3 batch")
+    logger.debug("Got S3 batch")
 
     sucessfully_copied = []
     for row in batch:
@@ -54,12 +57,10 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False, d
         try:
             objects = response['Contents']
             skip = True
-            if verbose:
-                print(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
+            logger.debug(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
         except Exception as e:
             skip = False
-            if verbose:
-                print(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
+            logger.debug(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
 
         if skip is not True:
             try:
@@ -69,25 +70,23 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose=False, d
                 # we store the list of sucessfully copied files
                 sucessfully_copied.append(row)
             except Exception as e:
-                logging.error(f"Error copying file {old_key}: {e}")
+                logger.error(f"Error copying file {old_key}: {e}")
 
-    if verbose:
-        print("S3 batch done")
+    logger.debug("S3 batch done")
 
     # we return the list of sucessfully copied files to be used as an input for the update of db rows
     return sucessfully_copied
 
 
 # this function updates a batch of database rows
-def update_db_batch(db_connection, rows_to_update, verbose=False, dry_run=False):
+def update_db_batch(db_connection, rows_to_update, dry_run=False):
 
     if dry_run:
         msg_prefix = 'DRY RUN '
     else:
         msg_prefix = ''
 
-    if verbose:
-        print("Got DB batch")
+    logger.debug("Got DB batch")
 
     cur = db_connection.cursor()
     nr_updated_rows = 0
@@ -98,25 +97,23 @@ def update_db_batch(db_connection, rows_to_update, verbose=False, dry_run=False)
             filename = os.path.basename(old_key)
             new_key = f"avatar/{filename}"
 
-            if verbose:
-                print(f"  * {msg_prefix}updating {old_key} to {new_key}")
+            logger.debug(f"  * {msg_prefix}updating {old_key} to {new_key}")
 
             if not dry_run:
                 cur.execute("UPDATE avatars SET path = %s WHERE id = %s", (new_key, row_id))
             nr_updated_rows += 1
     except Exception as e:
-        logging.error(f"Error updating row {entry}: {e}")
+        logger.error(f"Error updating row {entry}: {e}")
 
     db_connection.commit()
 
-    if verbose:
-        print("DB batch done")
+    logger.debug("DB batch done")
 
     return nr_updated_rows
 
 
 # this function processes a batch of data in terms of s3 copies and db row updates
-def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, verbose, dry_run):
+def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, dry_run):
 
     # we only update the entries that correspond to files that have been copied
     # files that were already on the destination bucket of files for which there was an error
@@ -124,7 +121,7 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, v
 
     # perform s3 copy
     start_time = time.time()
-    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, verbose, dry_run)
+    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run)
     end_time = time.time()
 
     elapsed_time = end_time - start_time
@@ -132,12 +129,11 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, v
 
     elapsed_time_readable = round(elapsed_time, 2)
 
-    if verbose:
-        print(f"\nThe execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
+    logger.debug(f"\nThe execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
 
     # update database rows
     start_time = time.time()
-    updated_rows = update_db_batch(db_connection, rows_to_update, verbose, dry_run)
+    updated_rows = update_db_batch(db_connection, rows_to_update, dry_run)
     end_time = time.time()
 
     elapsed_time = end_time - start_time
@@ -148,8 +144,7 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, v
 
     elapsed_time_readable = round(elapsed_time, 2)
 
-    if verbose:
-        print(f"\nThe execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
+    logger.debug(f"\nThe execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
 
     copied_files = len(rows_to_update)
 
@@ -157,7 +152,7 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, v
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, batch_size, verbose=False, dry_run=False):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, batch_size, dry_run=False):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -172,15 +167,14 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
 
         elapsed_time = round(end_time - start_time, 2)
 
-        if verbose:
-            print(f"\nThe execution of SELECT took {elapsed_time} seconds\n")
+        logger.debug(f"\nThe execution of SELECT took {elapsed_time} seconds\n")
 
         # we retreive the entries in batches
         batch = cur.fetchmany(batch_size)
 
         while len(batch) > 0:
 
-            copied_files, updated_rows = process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, verbose, dry_run)
+            copied_files, updated_rows = process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, dry_run)
             batch = cur.fetchmany(batch_size)
 
             total_copied_files += copied_files
@@ -189,7 +183,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
         cur.close()
 
     except Exception as e:
-        logging.error(f"Error getting file list entries: {e}")
+        logger.error(f"Error getting file list entries: {e}")
         db_connection.close()
         sys.exit(1)
 
@@ -198,8 +192,8 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
     else:
         msg_prefix = ''
 
-    print(f"{msg_prefix}Copied {total_copied_files} files")
-    print(f"{msg_prefix}Updated {total_updated_rows} rows")
+    logger.debug(f"{msg_prefix}Copied {total_copied_files} files")
+    logger.debug(f"{msg_prefix}Updated {total_updated_rows} rows")
 
     if total_updated_rows != total_copied_files:
-        print("ERROR: the number of updated rows should be equal to the number of copied files")
+        logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")
