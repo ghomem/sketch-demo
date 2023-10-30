@@ -5,9 +5,6 @@ import os
 import time
 import logging
 import argparse
-import psycopg2
-import boto3
-import botocore
 
 
 # yes, I know,  but we are importing "constants" from a custom module
