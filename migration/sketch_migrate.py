@@ -78,7 +78,8 @@ def main():
         log_level = logging.INFO
 
     logger.setLevel(log_level)
-    ch = logging.StreamHandler()
+    # we use stdout instead of the default (stderr) so that greps can be used
+    ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(log_level)
     formatter = logging.Formatter('%(message)s')
     ch.setFormatter(formatter)
