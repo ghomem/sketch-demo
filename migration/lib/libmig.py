@@ -33,6 +33,18 @@ def get_log_filename():
     return f"{LOG_DIR}/sketch_migrate_{user_str}_{date_str}_{random_str}.log"
 
 
+# this function generates a random key name
+def get_random_keyname():
+
+    random_str_1 = get_random_string(24, CHARSET_TMP)
+    random_str_2 = get_random_string(24, CHARSET_TMP)
+
+    # this file certainly does not exist :-)
+    # the last component is just for the unlikely case that there is a problem deleting yet
+    # so that we know where it came from
+    return f"{random_str_1}/{random_str_2}.sketch_migration_gustavo"
+
+
 # this function obtains a database connection
 def get_db_connection():
 
@@ -143,6 +155,19 @@ def check_status(db_connection, s3_connection, request_confirmation):
         else:
             logger.info('')
             return
+
+
+# this function checks if we have write permissions on the production bucket
+def check_bucket_write_permissions(s3_connection, bucket_name):
+
+    try:
+        hello_world_key = get_random_keyname()
+        s3_connection.put_object(Bucket=bucket_name, Key=hello_world_key, Body='hello world!')
+        s3_connection.delete_object(Bucket=bucket_name, Key=hello_world_key)
+    except Exception as e:
+        logger.error(f"Error while creating an test s3 object: {e}")
+        logger.error('Check your bucket write permissions')
+        sys.exit(1)
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
