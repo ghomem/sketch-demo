@@ -11,7 +11,7 @@ import argparse
 # all constants are in use and are UPPER_CASE, no danger in sight
 from lib.config import *
 
-from lib.libmig import copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection
+from lib.libmig import copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename
 
 
 # we obtain the logger declared in main for use within this module
@@ -78,12 +78,29 @@ def main():
         log_level = logging.INFO
 
     logger.setLevel(log_level)
-    # we use stdout instead of the default (stderr) so that greps can be used
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(log_level)
-    formatter = logging.Formatter('%(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+
+    # for the console handler we use stdout instead of the default (stderr) so that greps can be used
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(log_level)
+
+    # for the console we want regular formatting, it is easier to read
+    console_formatter = logging.Formatter('%(message)s')
+    console_handler.setFormatter(console_formatter)
+
+    # we also want to log to a file, we use one log file per execution, not an incremental log file
+    log_file = get_log_filename()
+
+    # for the file handler we use the custom named log file whose name was obtained above
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setLevel(log_level)
+
+    # for the file formatter we want timestaps for traceability from the future
+    file_formatter = logging.Formatter('%(asctime)s %(message)s')
+    file_handler.setFormatter(file_formatter)
+
+    # now lets add both handlers to our logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
 
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
@@ -112,6 +129,8 @@ def main():
 
     logger.info('Migrating legacy data')
 
+    logger.info(f"The log file for this execution will be {log_file}")
+
     start_time = time.time()
 
     migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.dry_run)
@@ -121,6 +140,10 @@ def main():
     elapsed_time = round(end_time - start_time, 2)
 
     logger.info(f"Execution finished after {elapsed_time} seconds")
+
+    # extra copy/paste niceness for the user
+    print('\nThe log file can be reviewed with:')
+    print(f"less {log_file}")
 
 
 # main script

@@ -34,3 +34,15 @@ AWS_DEFAULT_REGION  = 'us-east-1'
 
 AWS_ACCESS_KEY_ID     = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+### Other variables
+
+LOG_DIR = '/tmp'
+
+CAPITAL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+LETTERS = CAPITAL_LETTERS + LOWERCASE_LETTERS
+NUMBERS = "0123456789"
+
+# used for the random component of the log file name
+CHARSET_TMP = LETTERS + NUMBERS
