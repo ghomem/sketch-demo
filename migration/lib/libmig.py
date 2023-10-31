@@ -5,12 +5,32 @@ import logging
 import psycopg2
 import boto3
 import botocore
+import getpass
+import datetime
+import random
 
 from lib.config import *
 
 
 # we obtain the logger declared in main for use within this module
 logger = logging.getLogger("miglogger")
+
+
+def get_random_string(length, charset):
+
+    return ''.join(random.choice(charset) for i in range(length))
+
+
+# this function generates a convenient file name for a log file
+# it includes the username and date for traceability and portability
+# it includes a random component to prevent accidental overwriting
+def get_log_filename():
+
+    user_str   = getpass.getuser()
+    date_str   = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+    random_str = get_random_string(6, CHARSET_TMP)
+
+    return f"{LOG_DIR}/sketch_migrate_{user_str}_{date_str}_{random_str}.log"
 
 
 # this function obtains a database connection
