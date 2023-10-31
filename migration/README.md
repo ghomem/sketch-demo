@@ -17,9 +17,9 @@ This script requires:
 
 In order to use this script the config.py variables must be edited after which the following command can be executed:
 ```
-python3 sketch_migrate.py [-h] [-v] batch_size
+usage: sketch_migrate.py [-h] [-p PARALLELIZATION_LEVEL] [-b BATCH_SIZE] [-v] [-d] [-s]
 ```
 
-where ```batch_size``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration. The -v flag is available for debugging purposes. The -d value forces a dry run execution mode.
+where ```BATCH_SIZE``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration and ```PARALLELIZATION_LEVEL``` is the number of iterations executed in parallel. The -d value forces a dry run execution mode and the -s flag forces a data status report mode. The -v flag is available for debug purposes.
 
-It is recommended to execute the script with the -v and -f flags before proceeding to the actual migration.
+It is recommended to execute the script with the ```-v -d -p 1```, before proceeding to the actual migration.

@@ -61,7 +61,7 @@ def main():
 
     # optional parameters
     parser.add_argument('-p', '--parallelization-level', help='number of parallel worker processes',       type=int, default=1)
-    parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration', type=int, default=1)
+    parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration', type=int, default=20)
 
     # flags
     parser.add_argument('-v', '--verbose',     help='print extra messages',                          default=False, action='store_true')
