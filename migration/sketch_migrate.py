@@ -11,7 +11,8 @@ import argparse
 # all constants are in use and are UPPER_CASE, no danger in sight
 from lib.config import *
 
-from lib.libmig import copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename, check_status
+from lib.libmig import ( copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename,
+                         check_status, check_bucket_write_permissions )
 
 
 # we obtain the logger declared in main for use within this module
@@ -129,6 +130,12 @@ def main():
     except Exception as e:
         logger.error(f"Error while connecting to S3: {e}")
         sys.exit(1)
+
+    # Check if we have write permissions in the destination bucket
+
+    logger.info(f"Checking S3 write permissions for {S3_BUCKET_NAME}")
+
+    check_bucket_write_permissions(s3_conn, S3_BUCKET_NAME)
 
     # Check the status and reconfirm that the user wants to migrate from this status, if necessary
     if args.status_only:
