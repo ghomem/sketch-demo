@@ -11,7 +11,7 @@ import argparse
 # all constants are in use and are UPPER_CASE, no danger in sight
 from lib.config import *
 
-from lib.libmig import copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename
+from lib.libmig import copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename, check_status
 
 
 # we obtain the logger declared in main for use within this module
@@ -46,6 +46,7 @@ def check_willingness():
 
     user_response = input('Are you sure you want to continue? (yes/no) ')
 
+    logger.info('')
     if user_response != 'yes':
         logger.info('Execution canceled')
         exit(1)
@@ -61,8 +62,9 @@ def main():
     parser.add_argument('batch_size',       help='number of copies to process at once', type=int)
 
     # flags
-    parser.add_argument( '-v', '--verbose', help='print extra messages',                          default=False, action='store_true')
-    parser.add_argument( '-d', '--dry-run', help='simulate execution without actually executing', default=False, action='store_true')
+    parser.add_argument( '-v', '--verbose',     help='print extra messages',                          default=False, action='store_true')
+    parser.add_argument( '-d', '--dry-run',     help='simulate execution without actually executing', default=False, action='store_true')
+    parser.add_argument( '-s', '--status-only', help='only print the data status',                    default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -106,7 +108,8 @@ def main():
     check_environment()
 
     # Check if the user really wants to do this
-    check_willingness()
+    if not args.status_only:
+        check_willingness()
 
     logger.info('Connecting to the database')
 
@@ -127,6 +130,14 @@ def main():
         logger.error(f"Error while connecting to S3: {e}")
         sys.exit(1)
 
+    # Check the status and reconfirm that the user wants to migrate from this status, if necessary
+    if args.status_only:
+        check_status(conn, s3_conn, False)
+        conn.close()
+        exit(0)
+    else:
+        check_status(conn, s3_conn, True)
+
     logger.info('Migrating legacy data')
 
     logger.info(f"The log file for this execution will be {log_file}")
@@ -140,6 +151,8 @@ def main():
     elapsed_time = round(end_time - start_time, 2)
 
     logger.info(f"Execution finished after {elapsed_time} seconds")
+
+    check_status(conn, s3_conn, False)
 
     # extra copy/paste niceness for the user
     print('\nThe log file can be reviewed with:')
