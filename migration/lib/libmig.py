@@ -53,6 +53,98 @@ def get_s3_connection():
     return s3_connection
 
 
+# this function checks the current S3 and database status
+def check_s3_status(s3_connection, bucket_name):
+
+    response = s3_connection.list_objects_v2(Bucket=bucket_name, MaxKeys=S3_MAX_OBJECTS_REQ)
+
+    try:
+        objects = response['Contents']
+        nr_found_objects_partial = len(objects)
+        nr_found_objects_total   = len(objects)
+    except Exception as e:
+        nr_found_objects_partial = 0
+        nr_found_objects_total   = 0
+
+    # we need to loop because the list_objects_v2 functions never returns more than 1000
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/list_objects_v2.html#list-objects-v2
+
+    while nr_found_objects_partial > 0:
+
+        if not response.get('IsTruncated'):
+            break
+        else:
+            continuation_token = response.get('NextContinuationToken')
+
+        response = s3_connection.list_objects_v2(Bucket=bucket_name, MaxKeys=S3_MAX_OBJECTS_REQ, ContinuationToken=continuation_token)
+        try:
+            objects = response['Contents']
+            nr_found_objects_partial = len(objects)
+            nr_found_objects_total += nr_found_objects_partial
+            logger.debug(f"  * found so far {nr_found_objects_total}, bucket {bucket_name} has more objects")
+        except Exception as e:
+            logger.debug(f"  * found so far {nr_found_objects_total} bucket {bucket_name} has NO more objects")
+            nr_found_objects_partial = 0
+
+    logger.info(f"  * {nr_found_objects_total} objects in bucket {bucket_name}")
+
+    return nr_found_objects_total
+
+
+# this functions summarizes the DB status
+def check_db_status(db_connection):
+
+    cur = db_connection.cursor()
+
+    try:
+        cur.execute('SELECT COUNT(*) from avatars WHERE path LIKE(\'image/%\');')
+        legacy_count = cur.fetchone()[0]
+
+        cur.execute('SELECT COUNT(*) from avatars WHERE path LIKE(\'avatar/%\');')
+        prod_count = cur.fetchone()[0]
+
+        cur.execute('SELECT COUNT(*) from avatars')
+        total_count = cur.fetchone()[0]
+
+        entry_diff = total_count - (legacy_count + prod_count)
+
+        logger.info(f"  * {legacy_count} legacy entries in the database")
+        logger.info(f"  * {prod_count} production entries in the database")
+        logger.info(f"  * {entry_diff} unexpected entries in the database")
+        logger.info(f"  * {total_count} total entries in the database")
+
+    except Exception as e:
+        logger.error(f"Error querying database for status: {e}")
+
+
+# this function summarizes the S3 status
+def check_status(db_connection, s3_connection, request_confirmation):
+
+    logger.info('')
+    logger.info('Current data status:')
+    nr_found_objects_legacy     = check_s3_status(s3_connection, S3_BUCKET_NAME_LEG)
+    nr_found_objects_production = check_s3_status(s3_connection, S3_BUCKET_NAME)
+    nr_found_objects_total = nr_found_objects_legacy + nr_found_objects_production
+
+    logger.info(f"  * {nr_found_objects_total} total objects found\n")
+
+    check_db_status(db_connection)
+
+    logger.info('')
+    logger.info('NOTE: this script does not delete legacy objects')
+
+    if request_confirmation:
+        user_response = input('\nAre you sure you want perform the migration over this data status? (yes/no) ')
+
+        if user_response != 'yes':
+            logger.info('')
+            logger.info('Execution canceled')
+            exit(1)
+        else:
+            logger.info('')
+            return
+
+
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
 def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
 
@@ -149,7 +241,8 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, d
 
     elapsed_time_readable = round(elapsed_time, 2)
 
-    logger.debug(f"\nThe execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
+    logger.debug('')
+    logger.debug(f"The execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
 
     # update database rows
     start_time = time.time()
@@ -164,7 +257,8 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, d
 
     elapsed_time_readable = round(elapsed_time, 2)
 
-    logger.debug(f"\nThe execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
+    logger.debug('')
+    logger.debug(f"The execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
 
     copied_files = len(rows_to_update)
 
@@ -187,7 +281,8 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
 
         elapsed_time = round(end_time - start_time, 2)
 
-        logger.debug(f"\nThe execution of SELECT took {elapsed_time} seconds\n")
+        logger.debug('')
+        logger.debug(f"The execution of SELECT took {elapsed_time} seconds\n")
 
         # we retreive the entries in batches
         batch = cur.fetchmany(batch_size)
@@ -212,8 +307,8 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
     else:
         msg_prefix = ''
 
-    logger.debug(f"{msg_prefix}Copied {total_copied_files} files")
-    logger.debug(f"{msg_prefix}Updated {total_updated_rows} rows")
+    logger.info(f"{msg_prefix}Copied {total_copied_files} files")
+    logger.info(f"{msg_prefix}Updated {total_updated_rows} rows")
 
     if total_updated_rows != total_copied_files:
         logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")

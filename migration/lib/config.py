@@ -30,6 +30,11 @@ S3_BUCKET_NAME     = 'sketch-production-s3'
 S3_BUCKET_DOMAIN    = 'fra1.digitaloceanspaces.com'
 S3_ENDPOINT_URL     = f"https://{S3_BUCKET_NAME}.{S3_BUCKET_DOMAIN}"
 S3_ENDPOINT_URL_LEG = f"https://{S3_BUCKET_DOMAIN}"  # for the legacy client connection
+
+# maximum objects we are requesting at once (anything above 1000 is floored to 1000)
+# lower this value only to debug pagination
+S3_MAX_OBJECTS_REQ = 1000
+
 AWS_DEFAULT_REGION  = 'us-east-1'
 
 AWS_ACCESS_KEY_ID     = os.getenv('AWS_ACCESS_KEY_ID')
