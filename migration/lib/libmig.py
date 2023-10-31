@@ -9,6 +9,8 @@ import getpass
 import datetime
 import random
 
+from multiprocessing import Process, Manager, Queue
+
 from lib.config import *
 
 
@@ -250,7 +252,10 @@ def update_db_batch(db_connection, rows_to_update, dry_run=False):
 
 
 # this function processes a batch of data in terms of s3 copies and db row updates
-def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, dry_run):
+def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
+
+    db_connection = get_db_connection()
+    s3_connection = get_s3_connection()
 
     # we only update the entries that correspond to files that have been copied
     # files that were already on the destination bucket of files for which there was an error
@@ -287,11 +292,18 @@ def process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, d
 
     copied_files = len(rows_to_update)
 
-    return copied_files, updated_rows
+    # we pass the result as dictionary if a queue has been passed as an argument
+    # otherwise we use the tradicional return values
+    if queue is not None:
+        result = { "copied_files": copied_files, "updated_rows": updated_rows }
+        queue.put(result)
+        return
+    else:
+        return copied_files, updated_rows
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, batch_size, dry_run=False):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, batch_size, dry_run=False, parallelization_level=1):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -312,11 +324,54 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
         # we retreive the entries in batches
         batch = cur.fetchmany(batch_size)
 
+        # Create a queue to pass data between processes
+        manager = Manager()
+        queue   = manager.Queue()
+
         while len(batch) > 0:
+            nr_processes = 0
+            processes = []
+            while nr_processes < parallelization_level and len(batch) > 0:
 
-            copied_files, updated_rows = process_batch(db_connection, s3_connection, bucket_src, bucket_dst, batch, dry_run)
-            batch = cur.fetchmany(batch_size)
+                args = (bucket_src, bucket_dst, batch, dry_run, queue)
+                proc = Process(target=process_batch, args=args)
+                proc.daemon = True
 
+                processes.append(proc)
+                nr_processes += 1
+
+                batch = cur.fetchmany(batch_size)
+
+            # we exited the inner loop because we either reached the desired number of processes
+            # or because there are no more batches
+
+            # now let's start the processes
+            for p in processes:
+                p.start()
+
+            # and wait for their completion
+            for p in processes:
+                p.join()
+
+            # and now the lets the results from the queue
+            result_list = []
+            try:
+                # get all the items until the queue is empty
+                while True:
+                    entry = queue.get(False)
+                    result_list.append(entry)
+
+            except Exception as ex:
+                pass
+
+            # and proceed with the sums for this process group
+            copied_files = 0
+            updated_rows = 0
+            for result in result_list:
+                copied_files += result['copied_files']
+                updated_rows += result['updated_rows']
+
+            # and here we calculated the totals
             total_copied_files += copied_files
             total_updated_rows += updated_rows
 

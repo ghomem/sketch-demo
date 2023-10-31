@@ -59,13 +59,14 @@ def main():
 
     parser = argparse.ArgumentParser(description='This script migrates files from the legacy bucket to the current production bucket and updates the corresponding database entries.')
 
-    # positional required argument
-    parser.add_argument('batch_size',       help='number of copies to process at once', type=int)
+    # optional parameters
+    parser.add_argument('-p', '--parallelization-level', help='number of parallel worker processes',       type=int, default=1)
+    parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration', type=int, default=1)
 
     # flags
-    parser.add_argument( '-v', '--verbose',     help='print extra messages',                          default=False, action='store_true')
-    parser.add_argument( '-d', '--dry-run',     help='simulate execution without actually executing', default=False, action='store_true')
-    parser.add_argument( '-s', '--status-only', help='only print the data status',                    default=False, action='store_true')
+    parser.add_argument('-v', '--verbose',     help='print extra messages',                          default=False, action='store_true')
+    parser.add_argument('-d', '--dry-run',     help='simulate execution without actually executing', default=False, action='store_true')
+    parser.add_argument('-s', '--status-only', help='only print the data status',                    default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -151,7 +152,7 @@ def main():
 
     start_time = time.time()
 
-    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.dry_run)
+    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.dry_run, args.parallelization_level)
 
     end_time = time.time()
 
