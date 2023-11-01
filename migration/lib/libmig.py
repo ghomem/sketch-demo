@@ -194,6 +194,7 @@ def check_bucket_read_permissions(s3_connection, bucket_name):
         logger.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
         sys.exit(1)
 
+
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
 def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
 
