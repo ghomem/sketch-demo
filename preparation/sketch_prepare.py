@@ -18,11 +18,11 @@ from config import *
 def check_environment():
 
     if DB_USER is None:
-        logging.error('the SKETCH_DB_ADMIN_USER environment variable is not defined')
+        logging.error('the SKETCH_DB_USER environment variable is not defined')
         exit(1)
 
     if DB_PASS is None:
-        logging.error('the SKETCH_DB_ADMIN_PASS environment variable is not defined')
+        logging.error('the SKETCH_DB_PASS environment variable is not defined')
         exit(1)
 
     if AWS_ACCESS_KEY_ID is None:

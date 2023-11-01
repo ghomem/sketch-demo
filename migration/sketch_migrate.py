@@ -19,16 +19,15 @@ from lib.libmig import ( copy_s3_batch, update_db_batch, migrate_legacy_data, ge
 logger = logging.getLogger("miglogger")
 
 
-# FIXME it is not ADMIN user in the final version MIGRATION_USER
 # checks if the mandatory environment variables are defined
 def check_environment():
 
     if DB_USER is None:
-        logger.error('the SKETCH_DB_ADMIN_USER environment variable is not defined')
+        logger.error('the SKETCH_DB_USER environment variable is not defined')
         exit(1)
 
     if DB_PASS is None:
-        logger.error('the SKETCH_DB_ADMIN_PASS environment variable is not defined')
+        logger.error('the SKETCH_DB_PASS environment variable is not defined')
         exit(1)
 
     if AWS_ACCESS_KEY_ID is None:
