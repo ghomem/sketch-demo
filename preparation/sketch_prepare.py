@@ -165,15 +165,19 @@ def check_willingness(clean_production_bucket):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script seeds the database and s3 bucket with the number of legacy avatars passed as a first argument. Previously stored data is deleted.')
     parser.add_argument('number_of_avatars', type=int, help='Number of legacy avatars to create')
-    parser.add_argument( '-c', '--clean-production', help='Clean also the production bucket', default=False, action='store_true')
-    parser.add_argument( '-v', '--verbose', help='Print extra messages', default=False, action='store_true')
+
+    parser.add_argument('-c', '--clean-production', help='Clean also the production bucket', default=False, action='store_true')
+    parser.add_argument('-v', '--verbose',          help='Print extra messages',             default=False, action='store_true')
+    parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',        default=False, action='store_true')
+
     args = parser.parse_args()
 
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
     # Check if the user really wants to do this
-    check_willingness(args.clean_production)
+    if not args.say_yes:
+        check_willingness(args.clean_production)
 
     # Connect to the database server using the default database
     try:
