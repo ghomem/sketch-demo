@@ -14,6 +14,12 @@ import random
 from config import *
 
 
+# this function generates a random string with a certain lengh using a given charset
+def get_random_string(length, charset):
+
+    return ''.join(random.choice(charset) for i in range(length))
+
+
 # checks if the mandatory environment variables are defined
 def check_environment():
 
@@ -51,6 +57,7 @@ def create_db(connection):
         connection.autocommit = True
         cur = connection.cursor()
         cur.execute("DROP DATABASE proddatabase;")
+        cur.execute(f"DROP USER {DB_MIGRATION_USER}")
         cur.execute("CREATE DATABASE proddatabase;")
     except Exception as e:
         logging.error(f"Error creating the database: {e}")
@@ -62,7 +69,14 @@ def init_db(connection):
     try:
         cur = connection.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS avatars ( id SERIAL PRIMARY KEY, path VARCHAR );")
+        password = get_random_string(12, CHARSET_TMP)
+        cur.execute(f"CREATE USER migration WITH PASSWORD '{password}';;")
+        cur.execute(f"GRANT SELECT ON TABLE avatars TO {DB_MIGRATION_USER};")
+        cur.execute(f"GRANT UPDATE(path) ON TABLE avatars TO {DB_MIGRATION_USER};")
         connection.commit()
+
+        print(f"  * user {DB_MIGRATION_USER} created with password {password} for migration purposes")
+
     except Exception as e:
         logging.error(f"Error initializing the database: {e}")
         sys.exit(1)
