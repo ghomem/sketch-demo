@@ -109,7 +109,7 @@ def main():
 
     # basic sanity check on the inputs
     if args.batch_size < 1 or args.parallelization_level < 1:
-        logger.error('batch size and parallelization leval must be positive integers')
+        logger.error('batch size and parallelization level must be positive integers')
         exit(E_ERR)
 
     # Check if we have the necessary environment variables defined and fail early otherwise
