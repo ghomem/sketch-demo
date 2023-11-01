@@ -149,8 +149,8 @@ def check_status(db_connection, s3_connection, request_confirmation):
 
     db_status_list = check_db_status(db_connection)
 
-    # prepare a CSB string, as it is easier to parse from the outside
-    status_list = db_status_list + s3_status_list
+    # prepare a CSV string, as it is easier to parse from the outside
+    status_list = s3_status_list + db_status_list
     status_str = ','.join(str(x) for x in status_list)
 
     logger.info('')
