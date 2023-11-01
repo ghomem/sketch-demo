@@ -8,6 +8,7 @@ import botocore
 import getpass
 import datetime
 import random
+import math
 
 from multiprocessing import Process, Manager, Queue
 
@@ -303,13 +304,23 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, batch_size, dry_run=False, parallelization_level=1):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, dry_run=False, parallelization_level=1):
 
     total_copied_files = 0
     total_updated_rows = 0
 
+    if dry_run:
+        msg_prefix = 'DRY RUN '
+    else:
+        msg_prefix = ''
+
     try:
         cur = db_connection.cursor()
+
+        cur.execute('SELECT COUNT(*) from avatars WHERE path LIKE(\'image/%\');')
+        row_count = cur.fetchone()[0]
+
+        nr_batches_to_process = math.ceil(row_count / batch_size)
 
         start_time = time.time()
         # this SELECT statement fetches the rows that match the legacy pattern
@@ -328,6 +339,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
         manager = Manager()
         queue   = manager.Queue()
 
+        nr_batches_processed = 0
         while len(batch) > 0:
             nr_processes = 0
             processes = []
@@ -352,6 +364,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
             # and wait for their completion
             for p in processes:
                 p.join()
+                nr_batches_processed += 1
 
             # and now the lets the results from the queue
             result_list = []
@@ -371,9 +384,18 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
                 copied_files += result['copied_files']
                 updated_rows += result['updated_rows']
 
-            # and here we calculated the totals
+            # and here we calculate the totals
             total_copied_files += copied_files
             total_updated_rows += updated_rows
+
+            # and provide some progress information
+            progress_pct = round(nr_batches_processed / nr_batches_to_process * 100)
+            cur_time = time.time()
+            elapsed_time = round(cur_time - start_time, 2)
+
+            progress_str = f"{msg_prefix}  * Progress {progress_pct:3d}%, batches processed {nr_batches_processed}/{nr_batches_to_process}, files copied {total_copied_files}, rows updated {total_updated_rows}, elapsed time {elapsed_time}"
+
+            logger.info(progress_str)
 
         cur.close()
 
@@ -381,14 +403,6 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, ba
         logger.error(f"Error getting file list entries: {e}")
         db_connection.close()
         sys.exit(1)
-
-    if dry_run:
-        msg_prefix = 'DRY RUN '
-    else:
-        msg_prefix = ''
-
-    logger.info(f"{msg_prefix}Copied {total_copied_files} files")
-    logger.info(f"{msg_prefix}Updated {total_updated_rows} rows")
 
     if total_updated_rows != total_copied_files:
         logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")

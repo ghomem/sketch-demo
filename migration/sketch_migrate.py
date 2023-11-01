@@ -152,7 +152,10 @@ def main():
 
     start_time = time.time()
 
-    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, args.batch_size, args.dry_run, args.parallelization_level)
+    logger.info('')
+    logger.info('Progress information:')
+    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.parallelization_level)
+    logger.info('')
 
     end_time = time.time()
 
