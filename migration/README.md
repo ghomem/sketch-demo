@@ -15,7 +15,7 @@ This script requires:
   
 ## usage
 
-In order to use this script the [config.py](config.py) variables must be edited after which the following command can be executed:
+In order to use this script the [config.py](lib/config.py) variables must be edited after which the following command can be executed:
 ```
 usage: sketch_migrate.py [-h] [-p PARALLELIZATION_LEVEL] [-b BATCH_SIZE] [-v] [-d] [-s]
 ```
