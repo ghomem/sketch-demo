@@ -131,6 +131,8 @@ def check_db_status(db_connection):
     except Exception as e:
         logger.error(f"Error querying database for status: {e}")
 
+    return [ legacy_count, prod_count, total_count ]
+
 
 # this function summarizes the S3 status
 def check_status(db_connection, s3_connection, request_confirmation):
@@ -141,9 +143,15 @@ def check_status(db_connection, s3_connection, request_confirmation):
     nr_found_objects_production = check_s3_status(s3_connection, S3_BUCKET_NAME)
     nr_found_objects_total = nr_found_objects_legacy + nr_found_objects_production
 
+    s3_status_list = [ nr_found_objects_legacy, nr_found_objects_production ]
+
     logger.info(f"  * {nr_found_objects_total} total objects found\n")
 
-    check_db_status(db_connection)
+    db_status_list = check_db_status(db_connection)
+
+    # prepare a CSB string, as it is easier to parse from the outside
+    status_list = db_status_list + s3_status_list
+    status_str = ','.join(str(x) for x in status_list)
 
     logger.info('')
     logger.info('NOTE: this script does not delete legacy objects')
@@ -157,7 +165,9 @@ def check_status(db_connection, s3_connection, request_confirmation):
             exit(1)
         else:
             logger.info('')
-            return
+            return status_str
+
+    return status_str
 
 
 # this function checks if we have write permissions on the production bucket
