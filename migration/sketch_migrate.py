@@ -64,9 +64,11 @@ def main():
     parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration', type=int, default=20)
 
     # flags
-    parser.add_argument('-v', '--verbose',     help='print extra messages',                          default=False, action='store_true')
-    parser.add_argument('-d', '--dry-run',     help='simulate execution without actually executing', default=False, action='store_true')
-    parser.add_argument('-s', '--status-only', help='only print the data status',                    default=False, action='store_true')
+    parser.add_argument('-v', '--verbose',          help='print extra messages',                            default=False, action='store_true')
+    parser.add_argument('-d', '--dry-run',          help='simulate execution without actually executing',   default=False, action='store_true')
+    parser.add_argument('-s', '--status-only',      help='only print the data status',                      default=False, action='store_true')
+    parser.add_argument('-t', '--technical-status', help='print a line with the numbers values at the end', default=False, action='store_true')
+    parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',                       default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -109,8 +111,9 @@ def main():
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
-    # Check if the user really wants to do this
-    if not args.status_only:
+    # Check if the user really wants to migrate
+    # unless are only printing the status or the user disables confirmations prompts
+    if not args.status_only and not args.say_yes:
         check_willingness()
 
     logger.info('Connecting to the database')
@@ -140,11 +143,13 @@ def main():
 
     # Check the status and reconfirm that the user wants to migrate from this status, if necessary
     if args.status_only:
-        check_status(conn, s3_conn, False)
+        status = check_status(conn, s3_conn, False)
+        if args.technical_status:
+            print(f"\ntech_status {status}")
         conn.close()
         exit(0)
     else:
-        check_status(conn, s3_conn, True)
+        check_status(conn, s3_conn, not args.say_yes)
 
     logger.info('Migrating legacy data')
 
@@ -163,11 +168,14 @@ def main():
 
     logger.info(f"Execution finished after {elapsed_time} seconds")
 
-    check_status(conn, s3_conn, False)
+    status = check_status(conn, s3_conn, False)
 
     # extra copy/paste niceness for the user
     print('\nThe log file can be reviewed with:')
     print(f"less {log_file}")
+
+    if args.technical_status:
+        print(f"\ntech_status {status}")
 
 
 # main script
