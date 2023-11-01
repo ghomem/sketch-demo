@@ -166,9 +166,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script seeds the database and s3 bucket with the number of legacy avatars passed as a first argument. Previously stored data is deleted.')
     parser.add_argument('number_of_avatars', type=int, help='Number of legacy avatars to create')
 
-    parser.add_argument('-c', '--clean-production', help='Clean also the production bucket', default=False, action='store_true')
-    parser.add_argument('-v', '--verbose',          help='Print extra messages',             default=False, action='store_true')
-    parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',        default=False, action='store_true')
+    parser.add_argument('-c', '--clean-production', help='Clean also the production bucket',         default=False, action='store_true')
+    parser.add_argument('-v', '--verbose',          help='Print extra messages',                     default=False, action='store_true')
+    parser.add_argument('-t', '--technical-status', help='print a line with the numbers at the end', default=False, action='store_true')
+    parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',                default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -286,3 +287,6 @@ if __name__ == "__main__":
     conn.close()
 
     print(f"\nCreated {legacy_avatars} legacy avatars and {production_avatars} production avatars")
+
+    if args.technical_status:
+        print(f"tech_status {legacy_avatars},{production_avatars}")
