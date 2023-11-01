@@ -173,6 +173,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    logging.basicConfig(format='%(message)s')
+
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
@@ -184,8 +186,8 @@ if __name__ == "__main__":
     try:
         conn = psycopg2.connect(DB_CONN_STRING_0)
     except Exception as e:
-        logging.error(f"Error while connecting to the database server: {e}")
-        conn.close()
+        logging.error(f"Error while connecting to the database server {DB_HOST} with database {DB_NAME} and user {DB_USER}")
+        logging.error('  * please check the database hostname and credentials.')
         sys.exit(1)
 
     # Create our database
@@ -255,7 +257,8 @@ if __name__ == "__main__":
             init_bucket(s3, S3_BUCKET_NAME, args.verbose)
 
     except Exception as e:
-        logging.error(f"Error while cleaning the S3 bucket: {e}")
+        logging.error(f"Error while cleaning the S3 buckets {S3_BUCKET_NAME_LEG} and {S3_BUCKET_NAME} in {S3_BUCKET_DOMAIN}")
+        logging.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
         sys.exit(1)
 
     # Generate as many avatars as requested

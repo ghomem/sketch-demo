@@ -12,7 +12,7 @@ import argparse
 from lib.config import *
 
 from lib.libmig import ( copy_s3_batch, update_db_batch, migrate_legacy_data, get_db_connection, get_s3_connection, get_log_filename,
-                         check_status, check_bucket_write_permissions )
+                         check_status, check_bucket_read_permissions, check_bucket_write_permissions )
 
 
 # we obtain the logger declared in main for use within this module
@@ -122,8 +122,8 @@ def main():
     try:
         conn = get_db_connection()
     except Exception as e:
-        logger.error(f"Error while connecting to the database server using our database: {e}")
-        conn.close()
+        logger.error(f"Error while connecting to the database server {DB_HOST} with database {DB_NAME} and user {DB_USER}")
+        logger.error('  * please check the database hostname and credentials.')
         sys.exit(1)
 
     logger.info('Connecting to the S3 storage')
@@ -135,9 +135,13 @@ def main():
         logger.error(f"Error while connecting to S3: {e}")
         sys.exit(1)
 
-    # Check if we have write permissions in the destination bucket
+    # Check if we have the necessary permissions on each buckets
 
-    logger.info(f"Checking S3 write permissions for {S3_BUCKET_NAME}")
+    logger.info(f"Checking S3 read permissions for {S3_BUCKET_NAME_LEG} on {S3_BUCKET_DOMAIN}")
+
+    check_bucket_read_permissions(s3_conn, S3_BUCKET_NAME_LEG)
+
+    logger.info(f"Checking S3 write permissions for {S3_BUCKET_NAME} on {S3_BUCKET_DOMAIN}")
 
     check_bucket_write_permissions(s3_conn, S3_BUCKET_NAME)
 
