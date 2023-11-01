@@ -5,17 +5,21 @@ This script prepares the environment for a demo migration procedure by populatin
 
 ## requirements
 This script requires:
-* a working PostgreSQL database reachable on the machine where it is executed
+* a working PostgreSQL database reachable from the machine where it is executed
 * admin credentials for this database
 * access key/secret pair with write access to the S3 bucket
 * the following apt packages: ```python3-psycopg2```, ```python3-boto3```, ```postgresql-client```
-* the following environment variables: ```SKETCH_DB_ADMIN_USER```, ```SKETCH_DB_ADMIN_PASS```, ```AWS_ACCESS_KEY_ID```, ```AWS_SECRET_ACCESS_KEY```
+* the following environment variables: ```SKETCH_DB_USER```, ```SKETCH_DB_PASS```, ```AWS_ACCESS_KEY_ID```, ```AWS_SECRET_ACCESS_KEY```
   
 ## usage
 
-In order to use this script the config.py variables must be edited after which the following command can be executed:
+In order to use this script the [config.py](lib/config.py) variables must be edited after which the following command can be executed:
 ```
 python3 sketch_prepare.py [-h] [-c] [-v] number_of_avatars
 ```
 
 where ```number_of_avatars``` is the number of entries (files and database rows) to generate. The -c flag enables the clean up of the production bucket. The -v flag is available for debugging purposes.
+
+## notes
+
+The preparation script creates a migration user whose username and password are shown in the terminal. This user has only permissions to execute ```SELECT``` and ```UPDATE(path)``` in the ```avatars``` table.

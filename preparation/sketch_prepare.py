@@ -14,24 +14,30 @@ import random
 from config import *
 
 
+# this function generates a random string with a certain lengh using a given charset
+def get_random_string(length, charset):
+
+    return ''.join(random.choice(charset) for i in range(length))
+
+
 # checks if the mandatory environment variables are defined
 def check_environment():
 
     if DB_USER is None:
-        logging.error('the SKETCH_DB_ADMIN_USER environment variable is not defined')
-        exit(1)
+        logging.error('the SKETCH_DB_USER environment variable is not defined')
+        exit(E_ERR)
 
     if DB_PASS is None:
-        logging.error('the SKETCH_DB_ADMIN_PASS environment variable is not defined')
-        exit(1)
+        logging.error('the SKETCH_DB_PASS environment variable is not defined')
+        exit(E_ERR)
 
     if AWS_ACCESS_KEY_ID is None:
         logging.error('the AWS_ACCESS_KEY_ID environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if AWS_SECRET_ACCESS_KEY is None:
         logging.error('the AWS_SECRET_ACCESS_KEY is not defined')
-        exit(1)
+        exit(E_ERR)
 
 
 # generates the avatar path
@@ -51,10 +57,11 @@ def create_db(connection):
         connection.autocommit = True
         cur = connection.cursor()
         cur.execute("DROP DATABASE proddatabase;")
+        cur.execute(f"DROP USER {DB_MIGRATION_USER}")
         cur.execute("CREATE DATABASE proddatabase;")
     except Exception as e:
         logging.error(f"Error creating the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # creates the database table
@@ -62,10 +69,17 @@ def init_db(connection):
     try:
         cur = connection.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS avatars ( id SERIAL PRIMARY KEY, path VARCHAR );")
+        password = get_random_string(12, CHARSET_TMP)
+        cur.execute(f"CREATE USER migration WITH PASSWORD '{password}';;")
+        cur.execute(f"GRANT SELECT ON TABLE avatars TO {DB_MIGRATION_USER};")
+        cur.execute(f"GRANT UPDATE(path) ON TABLE avatars TO {DB_MIGRATION_USER};")
         connection.commit()
+
+        print(f"  * user {DB_MIGRATION_USER} created with password {password} for migration purposes")
+
     except Exception as e:
         logging.error(f"Error initializing the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # inserts the reference to an avatar in a table row
@@ -76,7 +90,7 @@ def insert_db_row(connection, path):
         connection.commit()
     except Exception as e:
         logging.error(f"Error inserting to the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # deletes every object inside the bucket
@@ -137,7 +151,7 @@ def create_s3_object(s3_conn, bucket, path):
         s3_conn.put_object(Bucket=bucket, Key=f"{path}", Body=DUMMY_AVATAR)
     except Exception as e:
         logging.error(f"Error while creating an s3 object: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # checks if the user really wants to move forward
@@ -156,7 +170,7 @@ def check_willingness(clean_production_bucket):
 
     if user_response != 'yes':
         print('Execution canceled')
-        exit(1)
+        exit(E_ERR)
     else:
         print('Execution starting')
 
@@ -165,23 +179,34 @@ def check_willingness(clean_production_bucket):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script seeds the database and s3 bucket with the number of legacy avatars passed as a first argument. Previously stored data is deleted.')
     parser.add_argument('number_of_avatars', type=int, help='Number of legacy avatars to create')
-    parser.add_argument( '-c', '--clean-production', help='Clean also the production bucket', default=False, action='store_true')
-    parser.add_argument( '-v', '--verbose', help='Print extra messages', default=False, action='store_true')
+
+    parser.add_argument('-c', '--clean-production', help='Clean also the production bucket',         default=False, action='store_true')
+    parser.add_argument('-v', '--verbose',          help='Print extra messages',                     default=False, action='store_true')
+    parser.add_argument('-t', '--technical-status', help='print a line with the numbers at the end', default=False, action='store_true')
+    parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',                default=False, action='store_true')
+
     args = parser.parse_args()
+
+    logging.basicConfig(format='%(message)s')
+
+    if args.number_of_avatars < 1:
+        logging.error('the number of avatars must be a positive integer')
+        exit(E_ERR)
 
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
     # Check if the user really wants to do this
-    check_willingness(args.clean_production)
+    if not args.say_yes:
+        check_willingness(args.clean_production)
 
     # Connect to the database server using the default database
     try:
         conn = psycopg2.connect(DB_CONN_STRING_0)
     except Exception as e:
-        logging.error(f"Error while connecting to the database server: {e}")
-        conn.close()
-        sys.exit(1)
+        logging.error(f"Error while connecting to the database server {DB_HOST} with database {DB_NAME} and user {DB_USER}")
+        logging.error('  * please check the database hostname and credentials.')
+        exit(E_ERR)
 
     # Create our database
     try:
@@ -190,7 +215,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while creating the database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Connect to the database server using our database
     try:
@@ -198,7 +223,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while connecting to the database server using our database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Initialize our database
     try:
@@ -207,7 +232,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while initializing creating the database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Initialize s3 connection
     try:
@@ -238,7 +263,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         logging.error(f"Error while connecting to S3: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
     # Clean the bucket
     try:
@@ -250,8 +275,9 @@ if __name__ == "__main__":
             init_bucket(s3, S3_BUCKET_NAME, args.verbose)
 
     except Exception as e:
-        logging.error(f"Error while cleaning the S3 bucket: {e}")
-        sys.exit(1)
+        logging.error(f"Error while cleaning the S3 buckets {S3_BUCKET_NAME_LEG} and {S3_BUCKET_NAME} in {S3_BUCKET_DOMAIN}")
+        logging.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
+        exit(E_ERR)
 
     # Generate as many avatars as requested
     print('Creating S3 objects and the corresponding database rows')
@@ -282,3 +308,8 @@ if __name__ == "__main__":
     conn.close()
 
     print(f"\nCreated {legacy_avatars} legacy avatars and {production_avatars} production avatars")
+
+    if args.technical_status:
+        print(f"tech_status {legacy_avatars},{production_avatars}")
+
+    exit(E_OK)
