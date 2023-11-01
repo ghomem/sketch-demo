@@ -5,7 +5,7 @@ This script prepares the environment for a demo migration procedure by populatin
 
 ## requirements
 This script requires:
-* a working PostgreSQL database reachable on the machine where it is executed
+* a working PostgreSQL database reachable from the machine where it is executed
 * admin credentials for this database
 * access key/secret pair with write access to the S3 bucket
 * the following apt packages: ```python3-psycopg2```, ```python3-boto3```, ```postgresql-client```
