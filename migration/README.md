@@ -23,3 +23,5 @@ usage: sketch_migrate.py [-h] [-p PARALLELIZATION_LEVEL] [-b BATCH_SIZE] [-v] [-
 where ```BATCH_SIZE``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration and ```PARALLELIZATION_LEVEL``` is the number of iterations executed in parallel. The -d value forces a dry run execution mode and the -s flag forces a data status report mode. The -v flag is available for debug purposes.
 
 It is recommended to execute the script with the ```-v -d -p 1```, before proceeding to the actual migration.
+
+Please use ```-h``` to review the full list of options.
