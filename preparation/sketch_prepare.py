@@ -19,19 +19,19 @@ def check_environment():
 
     if DB_USER is None:
         logging.error('the SKETCH_DB_USER environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if DB_PASS is None:
         logging.error('the SKETCH_DB_PASS environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if AWS_ACCESS_KEY_ID is None:
         logging.error('the AWS_ACCESS_KEY_ID environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if AWS_SECRET_ACCESS_KEY is None:
         logging.error('the AWS_SECRET_ACCESS_KEY is not defined')
-        exit(1)
+        exit(E_ERR)
 
 
 # generates the avatar path
@@ -54,7 +54,7 @@ def create_db(connection):
         cur.execute("CREATE DATABASE proddatabase;")
     except Exception as e:
         logging.error(f"Error creating the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # creates the database table
@@ -65,7 +65,7 @@ def init_db(connection):
         connection.commit()
     except Exception as e:
         logging.error(f"Error initializing the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # inserts the reference to an avatar in a table row
@@ -76,7 +76,7 @@ def insert_db_row(connection, path):
         connection.commit()
     except Exception as e:
         logging.error(f"Error inserting to the database: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # deletes every object inside the bucket
@@ -137,7 +137,7 @@ def create_s3_object(s3_conn, bucket, path):
         s3_conn.put_object(Bucket=bucket, Key=f"{path}", Body=DUMMY_AVATAR)
     except Exception as e:
         logging.error(f"Error while creating an s3 object: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # checks if the user really wants to move forward
@@ -156,7 +156,7 @@ def check_willingness(clean_production_bucket):
 
     if user_response != 'yes':
         print('Execution canceled')
-        exit(1)
+        exit(E_ERR)
     else:
         print('Execution starting')
 
@@ -175,6 +175,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(format='%(message)s')
 
+    if args.number_of_avatars < 1:
+        logging.error('the number of avatars must be a positive integer')
+        exit(E_ERR)
+
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
@@ -188,7 +192,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while connecting to the database server {DB_HOST} with database {DB_NAME} and user {DB_USER}")
         logging.error('  * please check the database hostname and credentials.')
-        sys.exit(1)
+        exit(E_ERR)
 
     # Create our database
     try:
@@ -197,7 +201,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while creating the database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Connect to the database server using our database
     try:
@@ -205,7 +209,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while connecting to the database server using our database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Initialize our database
     try:
@@ -214,7 +218,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while initializing creating the database: {e}")
         conn.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     # Initialize s3 connection
     try:
@@ -245,7 +249,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         logging.error(f"Error while connecting to S3: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
     # Clean the bucket
     try:
@@ -259,7 +263,7 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error while cleaning the S3 buckets {S3_BUCKET_NAME_LEG} and {S3_BUCKET_NAME} in {S3_BUCKET_DOMAIN}")
         logging.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
-        sys.exit(1)
+        exit(E_ERR)
 
     # Generate as many avatars as requested
     print('Creating S3 objects and the corresponding database rows')
@@ -293,3 +297,5 @@ if __name__ == "__main__":
 
     if args.technical_status:
         print(f"tech_status {legacy_avatars},{production_avatars}")
+
+    exit(E_OK)

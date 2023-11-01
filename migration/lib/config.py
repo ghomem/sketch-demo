@@ -9,6 +9,11 @@ import os
 
 # These variables are not part of the configuration since they are sensitive. The remaining variables should be added as necessary.
 
+### Exit codes
+
+E_OK  = 0
+E_ERR = 1
+
 ### Database related variables
 
 DB_HOST = 'sketch-production-db-do-user-7447558-0.c.db.ondigitalocean.com'
