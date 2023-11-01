@@ -14,7 +14,7 @@ This script requires:
 ## usage
 
 ```
-python3 sketch_test.py number_of_avatars, batch_size, parallelization_level
+python3 sketch_test.py number_of_avatars batch_size parallelization_level
 ```
 
 where ```number_of_avatars``` is the number of entries (files and database rows) to generate on the simulated environment, ```batch_size``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration and ```parallelization_level``` is the number of iterations executed in parallel.
