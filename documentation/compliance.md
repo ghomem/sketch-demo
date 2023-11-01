@@ -19,7 +19,7 @@ The delivery is such that:
 
 1. The program is written in Python and is compliant with a cherry-picked subset of PEP8. Configuration is separated from code and functions are relatively small, providing appropriate procedural abstration.
 2. The program has been prepared for execution on Ubuntu LTS without any external dependency.
-3. The program is delivered with a helper script that automatically prepares a test environment and with easy to use markdown documentation.
+3. The program is delivered with a helper script that automatically prepares a test environment and with easy to use markdown documentation. A simple integration test, that validates sucessful execution and measures performance, is also delivered.
 4. All delivered components (sketch_prepare.py, sketch_migrate.py and sketch_test.py) have a companion README file. The code contains contextual comments.
 5. The most common problems, including wrong hostnames, wrong resource names, wrong credentials and bad inputs have been simulated and gracefully handled in the code.
 6. The solution inclues a nearby Linux instance. The program avoids overwriting previously copied files and applies parallelization using the python multiprocessing module.
