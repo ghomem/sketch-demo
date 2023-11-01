@@ -24,19 +24,19 @@ def check_environment():
 
     if DB_USER is None:
         logger.error('the SKETCH_DB_USER environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if DB_PASS is None:
         logger.error('the SKETCH_DB_PASS environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if AWS_ACCESS_KEY_ID is None:
         logger.error('the AWS_ACCESS_KEY_ID environment variable is not defined')
-        exit(1)
+        exit(E_ERR)
 
     if AWS_SECRET_ACCESS_KEY is None:
         logger.error('the AWS_SECRET_ACCESS_KEY is not defined')
-        exit(1)
+        exit(E_ERR)
 
 
 # checks if the user really wants to move forward
@@ -49,7 +49,7 @@ def check_willingness():
     logger.info('')
     if user_response != 'yes':
         logger.info('Execution canceled')
-        exit(1)
+        exit(E_ERR)
     else:
         logger.info('Execution starting')
 
@@ -107,6 +107,11 @@ def main():
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
+    # basic sanity check on the inputs
+    if args.batch_size < 1 or args.parallelization_level < 1:
+        logger.error('batch size and parallelization leval must be positive integers')
+        exit(E_ERR)
+
     # Check if we have the necessary environment variables defined and fail early otherwise
     check_environment()
 
@@ -123,7 +128,7 @@ def main():
     except Exception as e:
         logger.error(f"Error while connecting to the database server {DB_HOST} with database {DB_NAME} and user {DB_USER}")
         logger.error('  * please check the database hostname and credentials.')
-        sys.exit(1)
+        exit(E_ERR)
 
     logger.info('Connecting to the S3 storage')
 
@@ -132,7 +137,7 @@ def main():
         s3_conn = get_s3_connection()
     except Exception as e:
         logger.error(f"Error while connecting to S3: {e}")
-        sys.exit(1)
+        exit(E_ERR)
 
     # Check if we have the necessary permissions on each buckets
 
@@ -150,7 +155,7 @@ def main():
         if args.technical_status:
             print(f"\ntech_status {status}")
         conn.close()
-        exit(0)
+        exit(E_OK)
     else:
         check_status(conn, s3_conn, not args.say_yes)
 
@@ -180,6 +185,7 @@ def main():
     if args.technical_status:
         print(f"\ntech_status {status}")
 
+    exit(E_OK)
 
 # main script
 if __name__ == "__main__":

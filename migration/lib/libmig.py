@@ -162,7 +162,7 @@ def check_status(db_connection, s3_connection, request_confirmation):
         if user_response != 'yes':
             logger.info('')
             logger.info('Execution canceled')
-            exit(1)
+            exit(E_ERR)
         else:
             logger.info('')
             return status_str
@@ -180,7 +180,7 @@ def check_bucket_write_permissions(s3_connection, bucket_name):
     except Exception as e:
         logger.error(f"Error while creating an test s3 object on bucket {bucket_name}")
         logger.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # this function checks if we have read permissions on a production bucket
@@ -192,7 +192,7 @@ def check_bucket_read_permissions(s3_connection, bucket_name):
     except Exception as e:
         logger.error(f"Error while listing the contents of bucket {bucket_name}")
         logger.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
-        sys.exit(1)
+        exit(E_ERR)
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
@@ -442,7 +442,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
     except Exception as e:
         logger.error(f"Error getting file list entries: {e}")
         db_connection.close()
-        sys.exit(1)
+        exit(E_ERR)
 
     if total_updated_rows != total_copied_files:
         logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")
