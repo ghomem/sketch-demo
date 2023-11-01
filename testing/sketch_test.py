@@ -106,31 +106,43 @@ def main():
     prep_cmd = f"{base_path}/../preparation/sketch_prepare.py"
     mig_cmd  = f"{base_path}/../migration/sketch_migrate.py"
 
-    result = subprocess.Popen([PYTHON_CMD, prep_cmd, str(args.number_of_avatars), '-cyt'], stdout=subprocess.PIPE )
-    prep_output_lines = result.stdout.readlines()
+    try:
+        result = subprocess.Popen([PYTHON_CMD, prep_cmd, str(args.number_of_avatars), '-cyt'], stdout=subprocess.PIPE )
 
-    # get the output in a clean list
-    tech_status_values = get_list_of_values_from_execution(prep_output_lines)
+        prep_output_lines = result.stdout.readlines()
+
+        # get the output in a clean list
+        tech_status_values = get_list_of_values_from_execution(prep_output_lines)
+
+        # obtain the values that have been allocated to legacy an production avatars
+        prep_legacy_avatars     = int(tech_status_values[0])
+        prep_production_avatars = int(tech_status_values[1])
+
+    except Exception as e:
+        print('Error executing the preparation command')
+        exit(E_ERR)
+
     print('Pre-migration requested values:', tech_status_values)
 
-    # obtain the values that have been allocated to legacy an production avatars
-    prep_legacy_avatars     = int(tech_status_values[0])
-    prep_production_avatars = int(tech_status_values[1])
+    try:
+        # now let's request the status with the migration script
+        result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-st'], stdout=subprocess.PIPE )
+        mig_initial_output_lines = result.stdout.readlines()
 
-    # now let's request the status with the migration script
-    result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-st'], stdout=subprocess.PIPE )
-    mig_initial_output_lines = result.stdout.readlines()
+        # get the output in a clean list
+        tech_status_values = get_list_of_values_from_execution(mig_initial_output_lines)
 
-    # get the output in a clean list
-    tech_status_values = get_list_of_values_from_execution(mig_initial_output_lines)
+        # obtain the values that have been detected for legacy and production avatars
+        mig_initial_legacy_avatars     = int(tech_status_values[0])
+        mig_initial_production_avatars = int(tech_status_values[1])
+        mig_initial_legacy_db_rows     = int(tech_status_values[2])
+        mig_initial_production_db_rows = int(tech_status_values[3])
+        mig_initial_total_db_rows      = int(tech_status_values[4])
+    except Exception as e:
+        print('Error executing the pre-migration status check command')
+        exit(E_ERR)
+
     print('Pre-migration detected values :', tech_status_values)
-
-    # obtain the values that have been detected for legacy and production avatars
-    mig_initial_legacy_avatars     = int(tech_status_values[0])
-    mig_initial_production_avatars = int(tech_status_values[1])
-    mig_initial_legacy_db_rows     = int(tech_status_values[2])
-    mig_initial_production_db_rows = int(tech_status_values[3])
-    mig_initial_total_db_rows      = int(tech_status_values[4])
 
     # check the pre-migration situation vs the situaion request to the preparation script
     if not check_prep_vs_mig_initial_status(prep_legacy_avatars,        prep_production_avatars,
@@ -142,21 +154,25 @@ def main():
     # if we survived this far let's perform the migration and measure the time
     start_time = time.time()
 
-    result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-ty', f"-b {args.batch_size}", f"-p {args.parallelization_level}"], stdout=subprocess.PIPE )
-    mig_final_output_lines = result.stdout.readlines()
+    try:
+        result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-ty', f"-b {args.batch_size}", f"-p {args.parallelization_level}"], stdout=subprocess.PIPE )
+        mig_final_output_lines = result.stdout.readlines()
 
-    end_time = time.time()
+        end_time = time.time()
 
-    # get the output in a clean list
-    tech_status_values = get_list_of_values_from_execution(mig_final_output_lines)
-    print('Post-migration detected values:', tech_status_values)
+        # get the output in a clean list
+        tech_status_values = get_list_of_values_from_execution(mig_final_output_lines)
+        print('Post-migration detected values:', tech_status_values)
 
-    # obtain the values that have been detected as legacy and production avatars
-    mig_final_legacy_avatars     = int(tech_status_values[0])
-    mig_final_production_avatars = int(tech_status_values[1])
-    mig_final_legacy_db_rows     = int(tech_status_values[2])
-    mig_final_production_db_rows = int(tech_status_values[3])
-    mig_final_total_db_rows      = int(tech_status_values[4])
+        # obtain the values that have been detected as legacy and production avatars
+        mig_final_legacy_avatars     = int(tech_status_values[0])
+        mig_final_production_avatars = int(tech_status_values[1])
+        mig_final_legacy_db_rows     = int(tech_status_values[2])
+        mig_final_production_db_rows = int(tech_status_values[3])
+        mig_final_total_db_rows      = int(tech_status_values[4])
+    except Exception as e:
+        print('Error executing the migration command')
+        exit(E_ERR)
 
     if not check_mig_initial_vs_final_status(mig_initial_legacy_avatars, mig_initial_production_avatars,
                                              mig_initial_legacy_db_rows, mig_initial_production_db_rows, mig_initial_total_db_rows,

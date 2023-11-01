@@ -6,10 +6,10 @@ This script prepares the environment for a demo migration procedure by populatin
 ## requirements
 This script requires:
 * a working PostgreSQL database reachable on the machine where it is executed
-* admin credentials for this database
+* credentials that are enough for row UPDATES on this database
 * access key/secret pair with write access to the S3 bucket
 * the following apt packages: ```python3-psycopg2```, ```python3-boto3```, ```postgresql-client```
-* the following environment variables: ```SKETCH_DB_ADMIN_USER```, ```SKETCH_DB_ADMIN_PASS```, ```AWS_ACCESS_KEY_ID```, ```AWS_SECRET_ACCESS_KEY```
+* the following environment variables: ```SKETCH_DB_USER```, ```SKETCH_DB_PASS```, ```AWS_ACCESS_KEY_ID```, ```AWS_SECRET_ACCESS_KEY```
   
 ## usage
 

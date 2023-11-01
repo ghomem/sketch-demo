@@ -2,8 +2,8 @@ import os
 
 # The following environment variables are REQUIRED
 #
-# SKETCH_DB_ADMIN_USER
-# SKETCH_DB_ADMIN_PASS
+# SKETCH_DB_USER
+# SKETCH_DB_PASS
 # AWS_ACCESS_KEY_ID
 # AWS_SECRET_ACCESS_KEY
 
@@ -15,8 +15,8 @@ DB_HOST = 'sketch-production-db-do-user-7447558-0.c.db.ondigitalocean.com'
 DB_PORT = 25060
 DB_NAME = 'proddatabase'
 
-DB_USER = os.getenv('SKETCH_DB_ADMIN_USER')
-DB_PASS = os.getenv('SKETCH_DB_ADMIN_PASS')
+DB_USER = os.getenv('SKETCH_DB_USER')
+DB_PASS = os.getenv('SKETCH_DB_PASS')
 
 DB_CONN_STRING = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 
@@ -28,8 +28,7 @@ S3_BUCKET_NAME     = 'sketch-production-s3'
 
 # S3 connection details
 S3_BUCKET_DOMAIN    = 'fra1.digitaloceanspaces.com'
-S3_ENDPOINT_URL     = f"https://{S3_BUCKET_NAME}.{S3_BUCKET_DOMAIN}"
-S3_ENDPOINT_URL_LEG = f"https://{S3_BUCKET_DOMAIN}"  # for the legacy client connection
+S3_ENDPOINT_URL_LEG = f"https://{S3_BUCKET_DOMAIN}"
 
 # maximum objects we are requesting at once (anything above 1000 is floored to 1000)
 # lower this value only to debug pagination

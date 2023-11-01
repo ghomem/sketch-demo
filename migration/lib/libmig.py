@@ -170,7 +170,7 @@ def check_status(db_connection, s3_connection, request_confirmation):
     return status_str
 
 
-# this function checks if we have write permissions on the production bucket
+# this function checks if we have write permissions a bucket
 def check_bucket_write_permissions(s3_connection, bucket_name):
 
     try:
@@ -178,8 +178,20 @@ def check_bucket_write_permissions(s3_connection, bucket_name):
         s3_connection.put_object(Bucket=bucket_name, Key=hello_world_key, Body='hello world!')
         s3_connection.delete_object(Bucket=bucket_name, Key=hello_world_key)
     except Exception as e:
-        logger.error(f"Error while creating an test s3 object: {e}")
-        logger.error('Check your bucket write permissions')
+        logger.error(f"Error while creating an test s3 object on bucket {bucket_name}")
+        logger.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
+        sys.exit(1)
+
+
+# this function checks if we have read permissions on a production bucket
+def check_bucket_read_permissions(s3_connection, bucket_name):
+
+    try:
+        hello_world_key = get_random_keyname()
+        s3_connection.list_objects_v2(Bucket=bucket_name,)
+    except Exception as e:
+        logger.error(f"Error while listing the contents of bucket {bucket_name}")
+        logger.error('  * check domain name, bucket name, key/secret pair and bucket write permissions')
         sys.exit(1)
 
 
