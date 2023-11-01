@@ -176,12 +176,18 @@ def check_bucket_write_permissions(s3_connection, bucket_name):
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
 def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
 
+    # because of process concurrency we need to delay the logs of this function
+    # and log them all at once
+    messages_to_log = []
+
+    start_time = time.time()
+
     if dry_run:
         msg_prefix = 'DRY RUN '
     else:
         msg_prefix = ''
 
-    logger.debug("Got S3 batch")
+    messages_to_log.append('Got S3 batch')
 
     sucessfully_copied = []
     for row in batch:
@@ -197,10 +203,10 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
         try:
             objects = response['Contents']
             skip = True
-            logger.debug(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
+            messages_to_log.append(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
         except Exception as e:
             skip = False
-            logger.debug(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
+            messages_to_log.append(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
 
         if skip is not True:
             try:
@@ -210,9 +216,22 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
                 # we store the list of sucessfully copied files
                 sucessfully_copied.append(row)
             except Exception as e:
-                logger.error(f"Error copying file {old_key}: {e}")
+                messages_to_log.append(f"Error copying file {old_key}: {e}")
 
-    logger.debug("S3 batch done")
+    messages_to_log.append('S3 batch done')
+
+    end_time = time.time()
+
+    elapsed_time = end_time - start_time
+    avg_time_per_file = round(elapsed_time / len(batch), 2)  # this is affected by previously existing files (but that is not the case of interest for measurement)
+
+    elapsed_time_readable = round(elapsed_time, 2)
+
+    messages_to_log.append('')
+    messages_to_log.append(f"The execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
+
+    for m in messages_to_log:
+        logger.debug(m)
 
     # we return the list of sucessfully copied files to be used as an input for the update of db rows
     return sucessfully_copied
@@ -221,12 +240,18 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
 # this function updates a batch of database rows
 def update_db_batch(db_connection, rows_to_update, dry_run=False):
 
+    # because of process concurrency we need to delay the logs of this function
+    # and log them all at once
+    messages_to_log = []
+
+    start_time = time.time()
+
     if dry_run:
         msg_prefix = 'DRY RUN '
     else:
         msg_prefix = ''
 
-    logger.debug("Got DB batch")
+    messages_to_log.append('Got DB batch')
 
     cur = db_connection.cursor()
     nr_updated_rows = 0
@@ -237,17 +262,34 @@ def update_db_batch(db_connection, rows_to_update, dry_run=False):
             filename = os.path.basename(old_key)
             new_key = f"avatar/{filename}"
 
-            logger.debug(f"  * {msg_prefix}updating {old_key} to {new_key}")
+            messages_to_log.append(f"  * {msg_prefix}updating {old_key} to {new_key}")
 
             if not dry_run:
                 cur.execute("UPDATE avatars SET path = %s WHERE id = %s", (new_key, row_id))
             nr_updated_rows += 1
     except Exception as e:
-        logger.error(f"Error updating row {entry}: {e}")
+        messages_to_log.append(f"Error updating row {entry}: {e}")
 
     db_connection.commit()
 
-    logger.debug("DB batch done")
+    messages_to_log.append('DB batch done')
+
+    end_time = time.time()
+
+    elapsed_time = end_time - start_time
+
+    if len(rows_to_update) > 0:
+        avg_time_per_row = round(elapsed_time / len(rows_to_update), 2)  # same criterium as for measuring files, affected by row update errors (not frequent, not the case of intereset)
+    else:
+        avg_time_per_row = -1
+
+    elapsed_time_readable = round(elapsed_time, 2)
+
+    messages_to_log.append('')
+    messages_to_log.append(f"The execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
+
+    for m in messages_to_log:
+        logger.debug(m)
 
     return nr_updated_rows
 
@@ -263,35 +305,11 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
     # do not have their corresponding db entry updated
 
     # perform s3 copy
-    start_time = time.time()
     rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run)
-    end_time = time.time()
-
-    elapsed_time = end_time - start_time
-    avg_time_per_file = round(elapsed_time / len(batch), 2)  # this is affected by previously existing files (but that is not the case of interest for measurement)
-
-    elapsed_time_readable = round(elapsed_time, 2)
-
-    logger.debug('')
-    logger.debug(f"The execution of copy_s3_batch took {elapsed_time_readable} seconds, avg {avg_time_per_file} per file\n")
+    copied_files = len(rows_to_update)
 
     # update database rows
-    start_time = time.time()
     updated_rows = update_db_batch(db_connection, rows_to_update, dry_run)
-    end_time = time.time()
-
-    elapsed_time = end_time - start_time
-    if len(rows_to_update) > 0:
-        avg_time_per_row = round(elapsed_time / len(rows_to_update), 2)  # same criterium as for measuring files, affected by row update errors (not frequent, not the case of intereset)
-    else:
-        avg_time_per_row = -1
-
-    elapsed_time_readable = round(elapsed_time, 2)
-
-    logger.debug('')
-    logger.debug(f"The execution of update_db_batch took {elapsed_time_readable} seconds, avg {avg_time_per_row} seconds per row\n")
-
-    copied_files = len(rows_to_update)
 
     # we pass the result as dictionary if a queue has been passed as an argument
     # otherwise we use the tradicional return values
