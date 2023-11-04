@@ -39,13 +39,14 @@ def get_log_filename():
 # this function generates a random key name
 def get_random_keyname():
 
+    user_str     = getpass.getuser()
     random_str_1 = get_random_string(24, CHARSET_TMP)
     random_str_2 = get_random_string(24, CHARSET_TMP)
 
     # this file certainly does not exist :-)
     # the last component is just for the unlikely case that there is a problem deleting yet
     # so that we know where it came from
-    return f"{random_str_1}/{random_str_2}.sketch_migration_gustavo"
+    return f"{random_str_1}/{random_str_2}.sketch_migration_{user_str}"
 
 
 # this function obtains a database connection
@@ -187,7 +188,6 @@ def check_bucket_write_permissions(s3_connection, bucket_name):
 def check_bucket_read_permissions(s3_connection, bucket_name):
 
     try:
-        hello_world_key = get_random_keyname()
         s3_connection.list_objects_v2(Bucket=bucket_name,)
     except Exception as e:
         logger.error(f"Error while listing the contents of bucket {bucket_name}")
