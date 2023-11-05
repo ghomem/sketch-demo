@@ -448,4 +448,4 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
         exit(E_ERR)
 
     if total_updated_rows != total_copied_files:
-        logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")
+        logger.error("ERROR: the number of updated rows should be equal to the number of copied files")
