@@ -65,6 +65,7 @@ def main():
     # flags
     parser.add_argument('-v', '--verbose',          help='print extra messages',                            default=False, action='store_true')
     parser.add_argument('-d', '--dry-run',          help='simulate execution without actually executing',   default=False, action='store_true')
+    parser.add_argument('-w', '--overwrite',        help='allow overwriting of existing files',             default=False, action='store_true')
     parser.add_argument('-s', '--status-only',      help='only print the data status',                      default=False, action='store_true')
     parser.add_argument('-t', '--technical-status', help='print a line with the numbers at the end',        default=False, action='store_true')
     parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',                       default=False, action='store_true')
@@ -167,7 +168,7 @@ def main():
 
     logger.info('')
     logger.info('Progress information:')
-    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.parallelization_level)
+    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.overwrite, args.parallelization_level)
     logger.info('')
 
     end_time = time.time()
@@ -186,7 +187,6 @@ def main():
         print(f"\ntech_status {status}")
 
     exit(E_OK)
-
 
 # main script
 if __name__ == "__main__":
