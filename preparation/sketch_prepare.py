@@ -56,9 +56,9 @@ def create_db(connection):
     try:
         connection.autocommit = True
         cur = connection.cursor()
-        cur.execute("DROP DATABASE IF EXISTS proddatabase;")
+        cur.execute(f"DROP DATABASE IF EXISTS {DB_NAME};")
         cur.execute(f"DROP USER IF EXISTS {DB_MIGRATION_USER}")
-        cur.execute("CREATE DATABASE proddatabase;")
+        cur.execute(f"CREATE DATABASE {DB_NAME};")
     except Exception as e:
         logging.error(f"Error creating the database: {e}")
         exit(E_ERR)
