@@ -237,7 +237,10 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False, o
             try:
                 # reference https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/copy.html#copy
                 if not dry_run:
-                    s3_connection.copy(copy_source, bucket_dst, new_key)
+                    # initial code: s3_connection.copy(copy_source, bucket_dst, new_key)
+                    # initially we used copy() but it turns out that copy_object is twice as fast
+                    # at least for small files
+                    s3_connection.copy_object(CopySource=f"{bucket_src}/{old_key}", Bucket=bucket_dst, Key=new_key)
                 # we store the list of sucessfully copied files
                 sucessfully_copied.append(row)
             except Exception as e:
