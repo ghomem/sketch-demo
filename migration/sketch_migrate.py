@@ -40,9 +40,12 @@ def check_environment():
 
 
 # checks if the user really wants to move forward
-def check_willingness():
+def check_willingness(overwrite):
 
     logger.info(f"WARNING: this script will modify rows at database {DB_NAME} after copying the files at {S3_BUCKET_NAME_LEG} to {S3_BUCKET_NAME}.")
+
+    if overwrite:
+        logger.info(f"WARNING: this script will overwrite files at {S3_BUCKET_NAME} if files with the same name exist at {S3_BUCKET_NAME_LEG}.")
 
     user_response = input('Are you sure you want to continue? (yes/no) ')
 
@@ -119,7 +122,7 @@ def main():
     # Check if the user really wants to migrate
     # unless are only printing the status or the user disables confirmations prompts
     if not args.status_only and not args.say_yes:
-        check_willingness()
+        check_willingness(args.overwrite)
 
     logger.info('Connecting to the database')
 
@@ -187,6 +190,7 @@ def main():
         print(f"\ntech_status {status}")
 
     exit(E_OK)
+
 
 # main script
 if __name__ == "__main__":
