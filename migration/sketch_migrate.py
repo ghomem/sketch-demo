@@ -40,9 +40,12 @@ def check_environment():
 
 
 # checks if the user really wants to move forward
-def check_willingness():
+def check_willingness(overwrite):
 
     logger.info(f"WARNING: this script will modify rows at database {DB_NAME} after copying the files at {S3_BUCKET_NAME_LEG} to {S3_BUCKET_NAME}.")
+
+    if overwrite:
+        logger.info(f"WARNING: this script will overwrite files at {S3_BUCKET_NAME} if files with the same name exist at {S3_BUCKET_NAME_LEG}.")
 
     user_response = input('Are you sure you want to continue? (yes/no) ')
 
@@ -65,6 +68,7 @@ def main():
     # flags
     parser.add_argument('-v', '--verbose',          help='print extra messages',                            default=False, action='store_true')
     parser.add_argument('-d', '--dry-run',          help='simulate execution without actually executing',   default=False, action='store_true')
+    parser.add_argument('-w', '--overwrite',        help='allow overwriting of existing files',             default=False, action='store_true')
     parser.add_argument('-s', '--status-only',      help='only print the data status',                      default=False, action='store_true')
     parser.add_argument('-t', '--technical-status', help='print a line with the numbers at the end',        default=False, action='store_true')
     parser.add_argument('-y', '--say-yes',          help='skip confirmation prompts',                       default=False, action='store_true')
@@ -118,7 +122,7 @@ def main():
     # Check if the user really wants to migrate
     # unless are only printing the status or the user disables confirmations prompts
     if not args.status_only and not args.say_yes:
-        check_willingness()
+        check_willingness(args.overwrite)
 
     logger.info('Connecting to the database')
 
@@ -167,7 +171,7 @@ def main():
 
     logger.info('')
     logger.info('Progress information:')
-    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.parallelization_level)
+    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.overwrite, args.parallelization_level)
     logger.info('')
 
     end_time = time.time()

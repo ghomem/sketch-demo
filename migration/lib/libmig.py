@@ -196,7 +196,7 @@ def check_bucket_read_permissions(s3_connection, bucket_name):
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
-def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
+def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False, overwrite=False):
 
     # because of process concurrency we need to delay the logs of this function
     # and log them all at once
@@ -218,17 +218,20 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
         filename = os.path.basename(old_key)
         new_key = f"avatar/{filename}"
 
-        # check first if an object with the same key is already in the production bucket
-        # for performance, integrity and idempotency reasons we do not overwrite an existing file on bucket_dst
-        response = s3_connection.list_objects_v2(Bucket=bucket_dst, Prefix=new_key)
-
-        try:
-            objects = response['Contents']
-            skip = True
-            messages_to_log.append(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
-        except Exception as e:
+        if overwrite is True:
             skip = False
             messages_to_log.append(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
+        else:
+            # check first if an object with the same key is already in the production bucket
+            # for performance, integrity and idempotency reasons we do not overwrite an existing file on bucket_dst
+            response = s3_connection.list_objects_v2(Bucket=bucket_dst, Prefix=new_key)
+            try:
+                objects = response['Contents']
+                skip = True
+                messages_to_log.append(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
+            except Exception as e:
+                skip = False
+                messages_to_log.append(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
 
         if skip is not True:
             try:
@@ -317,7 +320,7 @@ def update_db_batch(db_connection, rows_to_update, dry_run=False):
 
 
 # this function processes a batch of data in terms of s3 copies and db row updates
-def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
+def process_batch(bucket_src, bucket_dst, batch, dry_run, overwrite, queue=None):
 
     db_connection = get_db_connection()
     s3_connection = get_s3_connection()
@@ -327,7 +330,7 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
     # do not have their corresponding db entry updated
 
     # perform s3 copy
-    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run)
+    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run, overwrite)
     copied_files = len(rows_to_update)
 
     # update database rows
@@ -344,7 +347,7 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, dry_run=False, parallelization_level=1):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, dry_run=False, overwrite=False, parallelization_level=1):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -385,7 +388,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
             processes = []
             while nr_processes < parallelization_level and len(batch) > 0:
 
-                args = (bucket_src, bucket_dst, batch, dry_run, queue)
+                args = (bucket_src, bucket_dst, batch, dry_run, overwrite, queue)
                 proc = Process(target=process_batch, args=args)
                 proc.daemon = True
 
