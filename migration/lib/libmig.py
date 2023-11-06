@@ -39,13 +39,14 @@ def get_log_filename():
 # this function generates a random key name
 def get_random_keyname():
 
+    user_str     = getpass.getuser()
     random_str_1 = get_random_string(24, CHARSET_TMP)
     random_str_2 = get_random_string(24, CHARSET_TMP)
 
     # this file certainly does not exist :-)
     # the last component is just for the unlikely case that there is a problem deleting yet
     # so that we know where it came from
-    return f"{random_str_1}/{random_str_2}.sketch_migration_gustavo"
+    return f"{random_str_1}/{random_str_2}.sketch_migration_{user_str}"
 
 
 # this function obtains a database connection
@@ -187,7 +188,6 @@ def check_bucket_write_permissions(s3_connection, bucket_name):
 def check_bucket_read_permissions(s3_connection, bucket_name):
 
     try:
-        hello_world_key = get_random_keyname()
         s3_connection.list_objects_v2(Bucket=bucket_name,)
     except Exception as e:
         logger.error(f"Error while listing the contents of bucket {bucket_name}")
@@ -196,7 +196,7 @@ def check_bucket_read_permissions(s3_connection, bucket_name):
 
 
 # this function copies a batch of legacy files present on the legacy bucket to the production bucket
-def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
+def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False, overwrite=False):
 
     # because of process concurrency we need to delay the logs of this function
     # and log them all at once
@@ -218,23 +218,29 @@ def copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run=False):
         filename = os.path.basename(old_key)
         new_key = f"avatar/{filename}"
 
-        # check first if an object with the same key is already in the production bucket
-        # for performance, integrity and idempotency reasons we do not overwrite an existing file on bucket_dst
-        response = s3_connection.list_objects_v2(Bucket=bucket_dst, Prefix=new_key)
-
-        try:
-            objects = response['Contents']
-            skip = True
-            messages_to_log.append(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
-        except Exception as e:
+        if overwrite is True:
             skip = False
             messages_to_log.append(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
+        else:
+            # check first if an object with the same key is already in the production bucket
+            # for performance, integrity and idempotency reasons we do not overwrite an existing file on bucket_dst
+            response = s3_connection.list_objects_v2(Bucket=bucket_dst, Prefix=new_key)
+            try:
+                objects = response['Contents']
+                skip = True
+                messages_to_log.append(f"  * skipping {bucket_src}/{old_key} as {bucket_dst}/{new_key} already exists")
+            except Exception as e:
+                skip = False
+                messages_to_log.append(f"  * {msg_prefix}copying {bucket_src}/{old_key} to {bucket_dst}/{new_key}")
 
         if skip is not True:
             try:
                 # reference https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/copy.html#copy
                 if not dry_run:
-                    s3_connection.copy(copy_source, bucket_dst, new_key)
+                    # initial code: s3_connection.copy(copy_source, bucket_dst, new_key)
+                    # initially we used copy() but it turns out that copy_object is twice as fast
+                    # at least for small files
+                    s3_connection.copy_object(CopySource=f"{bucket_src}/{old_key}", Bucket=bucket_dst, Key=new_key)
                 # we store the list of sucessfully copied files
                 sucessfully_copied.append(row)
             except Exception as e:
@@ -317,7 +323,7 @@ def update_db_batch(db_connection, rows_to_update, dry_run=False):
 
 
 # this function processes a batch of data in terms of s3 copies and db row updates
-def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
+def process_batch(bucket_src, bucket_dst, batch, dry_run, overwrite, queue=None):
 
     db_connection = get_db_connection()
     s3_connection = get_s3_connection()
@@ -327,7 +333,7 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
     # do not have their corresponding db entry updated
 
     # perform s3 copy
-    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run)
+    rows_to_update = copy_s3_batch(s3_connection, bucket_src, bucket_dst, batch, dry_run, overwrite)
     copied_files = len(rows_to_update)
 
     # update database rows
@@ -344,7 +350,7 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, queue=None):
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, dry_run=False, parallelization_level=1):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, limit, dry_run=False, overwrite=False, parallelization_level=1):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -354,17 +360,25 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
     else:
         msg_prefix = ''
 
+    if limit > 0:
+        extra_sql = f" LIMIT {limit}"
+    else:
+        extra_sql = ''
+
+    select_str = f"SELECT * FROM avatars WHERE path LIKE(\'image/%\'){extra_sql}"
+
     try:
         cur = db_connection.cursor()
 
-        cur.execute('SELECT COUNT(*) from avatars WHERE path LIKE(\'image/%\');')
+        cur.execute(f"SELECT COUNT(*) FROM ({select_str}) foobar;")
         row_count = cur.fetchone()[0]
 
         nr_batches_to_process = math.ceil(row_count / batch_size)
 
         start_time = time.time()
+
         # this SELECT statement fetches the rows that match the legacy pattern
-        cur.execute('SELECT * from avatars WHERE path LIKE(\'image/%\');')
+        cur.execute(select_str + ';')
         end_time = time.time()
 
         elapsed_time = round(end_time - start_time, 2)
@@ -385,7 +399,7 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
             processes = []
             while nr_processes < parallelization_level and len(batch) > 0:
 
-                args = (bucket_src, bucket_dst, batch, dry_run, queue)
+                args = (bucket_src, bucket_dst, batch, dry_run, overwrite, queue)
                 proc = Process(target=process_batch, args=args)
                 proc.daemon = True
 
@@ -445,4 +459,4 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
         exit(E_ERR)
 
     if total_updated_rows != total_copied_files:
-        logger.debug("ERROR: the number of updated rows should be equal to the number of copied files")
+        logger.error("ERROR: the number of updated rows should be equal to the number of copied files")

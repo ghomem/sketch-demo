@@ -22,7 +22,7 @@ The delivery is such that:
 2. The program has been prepared for execution on Ubuntu LTS without any external dependency.
 3. The program is delivered with a helper script that automatically prepares a test environment and with easy to use markdown documentation. A simple integration test, that validates sucessful execution and measures performance, is also delivered.
 4. All delivered components (sketch_prepare.py, sketch_migrate.py and sketch_test.py) have a companion README file. The code contains contextual comments.
-5. The most common problems, including wrong hostnames, wrong resource names, wrong credentials and bad inputs have been simulated and gracefully handled in the code.
+5. The most common problems, including wrong hostnames, wrong resource names, wrong credentials and bad inputs have been simulated and gracefully handled in the code. The program can be resumed as many times as necessary. Furthermore, the migration can be executed by chunks thanks to the -l flag, that allows to set a limit for the migrated entries per execution.
 6. The solution inclues a nearby Linux instance. The program avoids overwriting previously copied files and applies parallelization using the python multiprocessing module.
 7. The program does not change any database entry until the corresponding file has been copied between buckets.
 8. The following resources were created on a Digital Ocean cloud account: PostegrSQL database, Ubuntu Linux droplet, S3 compatible buckets.

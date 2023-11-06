@@ -155,7 +155,7 @@ def main():
     start_time = time.time()
 
     try:
-        result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-ty', f"-b {args.batch_size}", f"-p {args.parallelization_level}"], stdout=subprocess.PIPE )
+        result = subprocess.Popen([PYTHON_CMD, mig_cmd, '-tyw', f"-b {args.batch_size}", f"-p {args.parallelization_level}"], stdout=subprocess.PIPE )
         mig_final_output_lines = result.stdout.readlines()
 
         end_time = time.time()
