@@ -360,23 +360,25 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
     else:
         msg_prefix = ''
 
+    if limit > 0:
+        extra_sql = f" LIMIT {limit}"
+    else:
+        extra_sql = ''
+
+    select_str = f"SELECT * FROM avatars WHERE path LIKE(\'image/%\'){extra_sql}"
+
     try:
         cur = db_connection.cursor()
 
-        cur.execute('SELECT COUNT(*) from avatars WHERE path LIKE(\'image/%\');')
+        cur.execute(f"SELECT COUNT(*) FROM ({select_str}) foobar;")
         row_count = cur.fetchone()[0]
 
         nr_batches_to_process = math.ceil(row_count / batch_size)
 
         start_time = time.time()
 
-        if limit > 0:
-            extra_sql = f" LIMIT {limit}"
-        else:
-            extra_sql = ""
-
         # this SELECT statement fetches the rows that match the legacy pattern
-        cur.execute(f"SELECT * from avatars WHERE path LIKE(\'image/%\'){extra_sql};")
+        cur.execute(select_str + ';')
         end_time = time.time()
 
         elapsed_time = round(end_time - start_time, 2)
