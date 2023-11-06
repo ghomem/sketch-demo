@@ -350,7 +350,7 @@ def process_batch(bucket_src, bucket_dst, batch, dry_run, overwrite, queue=None)
 
 
 # this function performs the data migration work from a high level perspective
-def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, dry_run=False, overwrite=False, parallelization_level=1):
+def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, start_time, batch_size, limit, dry_run=False, overwrite=False, parallelization_level=1):
 
     total_copied_files = 0
     total_updated_rows = 0
@@ -369,8 +369,14 @@ def migrate_legacy_data(db_connection, s3_connection, bucket_src, bucket_dst, st
         nr_batches_to_process = math.ceil(row_count / batch_size)
 
         start_time = time.time()
+
+        if limit > 0:
+            extra_sql = f" LIMIT {limit}"
+        else:
+            extra_sql = ""
+
         # this SELECT statement fetches the rows that match the legacy pattern
-        cur.execute('SELECT * from avatars WHERE path LIKE(\'image/%\');')
+        cur.execute(f"SELECT * from avatars WHERE path LIKE(\'image/%\'){extra_sql};")
         end_time = time.time()
 
         elapsed_time = round(end_time - start_time, 2)

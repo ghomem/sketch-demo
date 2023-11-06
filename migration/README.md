@@ -17,10 +17,10 @@ This script requires:
 
 In order to use this script the [config.py](lib/config.py) variables must be edited after which the following command can be executed:
 ```
-usage: sketch_migrate.py [-h] [-p PARALLELIZATION_LEVEL] [-b BATCH_SIZE] [-v] [-d] [-w] [-s]
+usage: sketch_migrate.py [-h] [-p PARALLELIZATION_LEVEL] [-b BATCH_SIZE] [-l limit] [-v] [-d] [-w] [-s]
 ```
 
-where ```BATCH_SIZE``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration and ```PARALLELIZATION_LEVEL``` is the number of iterations executed in parallel. The ```-d``` flag forces a dry run execution mode and the ```-s``` flag forces a data status report mode. The ```-w``` flag allows for files on the destination bucket to be overwritten. The ```-v``` flag is available for debug purposes and/or file by file progress logging.
+where ```BATCH_SIZE``` is the number of legacy data entries (bucket files, database rows) that are migrated on a single iteration, ```PARALLELIZATION_LEVEL``` is the number of iterations executed in parallel and ```LIMIT``` is an optional limit for the maximum number of entries migrated per execution. The ```-d``` flag forces a dry run execution mode and the ```-s``` flag forces a data status report mode. The ```-w``` flag allows for files on the destination bucket to be overwritten. The ```-v``` flag is available for debug purposes and/or file by file progress logging.
 
 Please use ```-h``` to review the full list of options.
 

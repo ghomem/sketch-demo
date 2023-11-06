@@ -62,8 +62,9 @@ def main():
     parser = argparse.ArgumentParser(description='This script migrates files from the legacy bucket to the current production bucket and updates the corresponding database entries.')
 
     # optional parameters
-    parser.add_argument('-p', '--parallelization-level', help='number of parallel worker processes',       type=int, default=1)
-    parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration', type=int, default=20)
+    parser.add_argument('-p', '--parallelization-level', help='number of parallel worker processes',        type=int, default=1)
+    parser.add_argument('-b', '--batch-size',            help='number of db and s3 entries per iteration',  type=int, default=20)
+    parser.add_argument('-l', '--limit',                 help='limit for the number of entries to migrate', type=int, default=0)
 
     # flags
     parser.add_argument('-v', '--verbose',          help='print extra messages',                            default=False, action='store_true')
@@ -114,6 +115,10 @@ def main():
     # basic sanity check on the inputs
     if args.batch_size < 1 or args.parallelization_level < 1:
         logger.error('batch size and parallelization level must be positive integers')
+        exit(E_ERR)
+
+    if args.limit < 0:
+        logger.error('limit must be greater than or equal to zero')
         exit(E_ERR)
 
     # Check if we have the necessary environment variables defined and fail early otherwise
@@ -171,7 +176,7 @@ def main():
 
     logger.info('')
     logger.info('Progress information:')
-    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.dry_run, args.overwrite, args.parallelization_level)
+    migrate_legacy_data(conn, s3_conn, S3_BUCKET_NAME_LEG, S3_BUCKET_NAME, start_time, args.batch_size, args.limit, args.dry_run, args.overwrite, args.parallelization_level)
     logger.info('')
 
     end_time = time.time()
